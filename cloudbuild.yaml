@@ -1,0 +1,38 @@
+steps:
+  # 1. 使用 Docker 建置 Flutter Web 容器映像檔
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'asia-east1-docker.pkg.dev/$PROJECT_ID/passexam-repo/passexam-web:latest'
+      - '-t'
+      - 'asia-east1-docker.pkg.dev/$PROJECT_ID/passexam-repo/passexam-web:$SHORT_SHA'
+      - '.'
+
+  # 2. 推送容器映像檔至 Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'asia-east1-docker.pkg.dev/$PROJECT_ID/passexam-repo/passexam-web:latest'
+
+  # 3. 部署至 Google Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'passexam-web'
+      - '--image=asia-east1-docker.pkg.dev/$PROJECT_ID/passexam-repo/passexam-web:latest'
+      - '--region=asia-east1'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--port=8080'
+      - '--memory=512Mi'
+      - '--cpu=1'
+
+images:
+  - 'asia-east1-docker.pkg.dev/$PROJECT_ID/passexam-repo/passexam-web:latest'
+  - 'asia-east1-docker.pkg.dev/$PROJECT_ID/passexam-repo/passexam-web:$SHORT_SHA'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

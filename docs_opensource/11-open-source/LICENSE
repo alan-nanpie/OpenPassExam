@@ -1,0 +1,49 @@
+# STRICT PROPRIETARY & SOURCE-AVAILABLE LICENSE
+# 專有版權與嚴格原始碼檢視授權條款
+
+Copyright (c) 2026 alan-nanpie / PassExam. All Rights Reserved.
+版權所有 (c) 2026 alan-nanpie / PassExam。保留所有權利。
+
+---
+
+### 1. 授權範圍 (Grant of License)
+本專案之原始碼、規格文件、資料庫設計、架構圖表與所有附屬資源（以下統稱「本作品」）僅供公開檢閱、學習參考與技術評估之用。
+
+This source code, documentation, architectural designs, specifications, diagrams, and all associated materials (collectively, the "Work") are provided solely for public inspection, educational reference, and technical evaluation purposes.
+
+---
+
+### 2. 嚴格禁止事項 (Strict Prohibitions)
+未經版權所有者（alan-nanpie）事前明確之書面授權，任何個人、團體、企業或組織**嚴格禁止**從事以下行為：
+
+Without explicit, prior written authorization from the copyright holder (alan-nanpie), any individual, entity, or organization is **STRICTLY PROHIBITED** from:
+
+1. **商業營利使用 (Commercial Use)**:
+   - 禁止將本作品之全部或部分用於任何商業目的、營利性服務、付費課程、訂閱制平台或企業內部產品。
+   - No commercial exploitation, monetization, paid training, subscription platforms, or internal proprietary commercial deployments.
+
+2. **未授權再散布與分叉發布 (Redistribution & Fork Distribution)**:
+   - 禁止複製、散布、轉載、鏡像 (Mirror)、再授權 (Sublicense) 或重新封裝發布本作品。
+   - No copying, distributing, mirroring, sublicensing, or repackaging for public redistribution.
+
+3. **衍生作品與修改 (Derivative Works)**:
+   - 禁止基於本作品進行修改、改編、翻譯、反向工程或建立衍生產品。
+   - No modifying, adapting, translating, reverse engineering, or creating derivative works.
+
+4. **AI 模型訓練與資料抓取 (AI Training & Scraping Prohibition)**:
+   - 嚴格禁止將本作品（包含考題、解析、架構圖、RAG 切片）作為機器學習模型、大型語言模型 (LLM) 訓練資料集、微調資料 (Fine-tuning) 或未授權之網路爬蟲抓取用途。
+   - Strict prohibition against using any part of this Work for machine learning training, LLM fine-tuning, dataset aggregation, or automated scraping without written consent.
+
+---
+
+### 3. 智慧財產權聲明 (Intellectual Property)
+本作品所有之著作權、專利權、商標權及其他智慧財產權，均為版權所有者（alan-nanpie）獨家所有。
+
+All copyright, trademark, patent, and intellectual property rights in and to the Work remain the exclusive property of the copyright holder (alan-nanpie).
+
+---
+
+### 4. 免責聲明 (Disclaimer of Warranty & Limitation of Liability)
+本作品依「現況 (AS IS)」提供，不提供任何明示或默示之擔保。在法律允許之最大範圍內，版權所有者不對因使用或無法使用本作品而產生之任何直接、間接、附帶或衍生損害承擔任何責任。
+
+THE WORK IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM OR OUT OF THE USE OF THE WORK.\n

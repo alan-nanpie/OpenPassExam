@@ -1,0 +1,41 @@
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+*.lock
+
+# Secrets & Credentials (CRITICAL - NEVER COMMIT)
+secrets.json
+secrets.*.json
+*.keystore
+*.jks
+key.properties
+service-account*.json
+play-store-credentials*.json
+google-services*.json
+GoogleService-Info*.plist
+*credentials*.json
+*secret*.json
+*firebase-adminsdk*.json
+*.env
+.env*
+*.pem
+*.key
+*.p12
+*.pfx
+auth.json
+
+# IDE & OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+*.log
+
+# Scratch / Temp
+scratch/
+tmp/
+temp/

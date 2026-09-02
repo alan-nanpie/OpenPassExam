@@ -1,0 +1,13 @@
+.gcloudignore
+.git
+.gitignore
+.dart_tool/
+build/
+android/
+ios/
+windows/
+macos/
+linux/
+docs_opensource/
+test/
+*.log

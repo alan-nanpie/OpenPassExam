@@ -1,0 +1,15 @@
+.dart_tool/
+.git/
+.github/
+.idea/
+.vscode/
+build/
+android/
+ios/
+windows/
+macos/
+linux/
+docs_opensource/
+test/
+*.log
+*.md
