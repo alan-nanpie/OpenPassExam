@@ -45,6 +45,12 @@
 - ☁️ **[03-Google-Cloud-Run部署維運指南](./app_docs/03-Google-Cloud-Run部署維運指南.md)**：Docker 容器化與 Cloud Run 自動化上架。
 - 🤖 **[AI_AGENT_DOC_RULES](./app_docs/AI_AGENT_DOC_RULES.md)**：AI Agent 手冊存放與維護規範。
 
+## 🌐 線上展示站點 (Official Live Demo on Google Cloud Run)
+
+本系統已正式部署於 Google Cloud Run 無伺服器平台：
+👉 **https://openpassexam-web-nphsu7ckja-de.a.run.app**
+（支援 PWA 漸進式網頁應用、端側離線 AI 推理下載與雲端 Gemini 旗艦雙模態，任何人皆可直接免安裝開啟使用）
+
 ---
 
 ## 🛠️ 任何人如何自行申請、建置與執行 (Self-Hosting & Quick Start)

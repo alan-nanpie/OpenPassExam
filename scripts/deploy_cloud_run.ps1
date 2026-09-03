@@ -1,4 +1,4 @@
-﻿# ==============================================================================
+# ==============================================================================
 # PassExam - Google Cloud Run 全自動安全發布工具 (PowerShell)
 # 
 # 特點：
@@ -11,7 +11,7 @@ $ErrorActionPreference = "Continue"
 
 function Write-Header {
     Write-Host "`n========================================================" -ForegroundColor Cyan
-    Write-Host " 🚀 PassExam - Google Cloud Run 自動化發布管線" -ForegroundColor Yellow
+    Write-Host " 🚀 OpenPassExam - Google Cloud Run 自動化發布管線" -ForegroundColor Yellow
     Write-Host "========================================================`n" -ForegroundColor Cyan
 }
 
@@ -54,8 +54,8 @@ $ENV_EXAMPLE_FILE = Join-Path $SCRIPT_DIR "deploy.env.example"
 
 $PROJECT_ID = ""
 $REGION = "asia-east1"
-$REPO_NAME = "passexam-repo"
-$SERVICE_NAME = "passexam-web"
+$REPO_NAME = "openpassexam-repo"
+$SERVICE_NAME = "openpassexam-web"
 $IMAGE_TAG = "latest"
 $MEMORY_LIMIT = "512Mi"
 $CPU_LIMIT = "1"
