@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../controllers/ai_tutor_controller.dart';
+import '../../services/offline_model_manager.dart';
 import 'persona_selector_widget.dart';
 
 class AiTutorScreen extends StatefulWidget {
@@ -45,6 +46,30 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
       appBar: AppBar(
         title: Text(context.tr('ai_tutor_title')),
         actions: [
+          Builder(
+            builder: (ctx) {
+              final offlineMgr = ctx.watch<OfflineModelManager>();
+              final isDownloading = offlineMgr.status == OfflineModelStatus.downloading;
+              final isReady = offlineMgr.isModelReady;
+
+              return IconButton(
+                icon: isDownloading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                      )
+                    : Icon(
+                        isReady ? Icons.offline_bolt : Icons.download_for_offline_outlined,
+                        color: isReady ? AppColors.correctGreen : AppColors.warning,
+                      ),
+                tooltip: isDownloading
+                    ? '離線 AI 模型下載中 (${(offlineMgr.downloadProgress * 100).toInt()}%)'
+                    : (isReady ? '端側離線 AI 模型：已就緒 (點此管理或下載)' : '下載離線 AI 模型 (Gemma 4 2B)'),
+                onPressed: () => _showOfflineModelModal(context, offlineMgr),
+              );
+            },
+          ),
           IconButton(
             icon: Icon(
               aiCtrl.hasUserApiKey ? Icons.vpn_key : Icons.vpn_key_outlined,
@@ -62,6 +87,77 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
       ),
       body: Column(
         children: [
+          // 頂部 AI 模式指示與切換列 (離線優先 / 雲端旗艦)
+          Builder(
+            builder: (ctx) {
+              final offlineMgr = ctx.watch<OfflineModelManager>();
+              final isOfflinePreferred = offlineMgr.preferOffline;
+              final isReady = offlineMgr.isModelReady;
+              final isDownloading = offlineMgr.status == OfflineModelStatus.downloading;
+
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.darkCard : Colors.grey.shade100,
+                  border: Border(bottom: BorderSide(color: isDark ? Colors.white10 : Colors.grey.shade300)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      isDownloading
+                          ? Icons.downloading_rounded
+                          : (isOfflinePreferred ? Icons.offline_bolt : Icons.cloud_done),
+                      size: 18,
+                      color: isDownloading
+                          ? AppColors.primary
+                          : (isOfflinePreferred ? AppColors.correctGreen : AppColors.primary),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isDownloading
+                                ? '📥 正在下載端側模型 (${(offlineMgr.downloadProgress * 100).toInt()}%)'
+                                : (isOfflinePreferred
+                                    ? (isReady ? '⚡ 模式：端側離線推論 (Gemma 4 2B 已就緒)' : '⚡ 模式：端側離線 (尚未下載完整模型)')
+                                    : (aiCtrl.hasUserApiKey ? '☁️ 模式：Google 雲端 Gemini 旗艦推論' : '☁️ 模式：雲端模式 (未填 Key 自動轉端側)')),
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            isOfflinePreferred ? '0 延遲 • 零網路流量消耗 • 100% 隱私' : '高深度 Dynamic Thinking 思考架構',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton.tonalIcon(
+                      style: FilledButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      ),
+                      icon: Icon(
+                        isReady ? Icons.tune : Icons.download,
+                        size: 14,
+                      ),
+                      label: Text(
+                        isReady ? '模型管理' : '下載離線模型',
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
+                      onPressed: () => _showOfflineModelModal(context, offlineMgr),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+
           // 未設定 API Key 提示列
           if (!aiCtrl.hasUserApiKey)
             InkWell(
@@ -75,7 +171,7 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        '💡 目前為離線端側模式。點此填入免費 Gemini Key 啟用旗艦推理！',
+                        '💡 目前為離線端側模式。點此填入免費 Gemini Key 啟用雲端旗艦推理！',
                         style: TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -411,5 +507,234 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
       ),
     );
   }
-}
 
+  void _showOfflineModelModal(BuildContext context, OfflineModelManager offlineMgr) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (bottomCtx, setModalState) {
+          final isReady = offlineMgr.isModelReady;
+          final isDownloading = offlineMgr.status == OfflineModelStatus.downloading;
+
+          return Container(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade400,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: (isReady ? AppColors.correctGreen : AppColors.primary).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        isReady ? Icons.offline_bolt : Icons.downloading_rounded,
+                        color: isReady ? AppColors.correctGreen : AppColors.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            '端側離線 AI 模型管理中心',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                          Text(
+                            offlineMgr.modelName,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // 規格卡片
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('模型規格', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                          Text(offlineMgr.modelName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('磁碟空間', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                          Text(offlineMgr.modelEstimatedSize, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('硬體加速支援', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                          Expanded(
+                            child: Text(
+                              offlineMgr.platformSupportDescription,
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                              textAlign: TextAlign.end,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // 下載與狀態區塊
+                if (isDownloading) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('正在下載模型並解密 LiteRT 權重...', style: TextStyle(fontSize: 12)),
+                      Text(
+                        '${(offlineMgr.downloadProgress * 100).toInt()}%',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: offlineMgr.downloadProgress,
+                      minHeight: 8,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ] else if (isReady) ...[
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.correctGreen.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.correctGreen.withValues(alpha: 0.3)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.check_circle, size: 18, color: AppColors.correctGreen),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '端側離線 AI 模型已就緒！無網路時能進行 4096 Tokens 極速推論。',
+                            style: TextStyle(fontSize: 12, color: AppColors.correctGreen, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                          icon: const Icon(Icons.delete_outline, size: 16),
+                          label: const Text('刪除模型 (釋放空間)'),
+                          onPressed: () async {
+                            await offlineMgr.deleteModel();
+                            setModalState(() {});
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else ...[
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded, size: 18, color: Colors.orange),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '尚未下載完整離線模型檔案。點擊下方按鈕即可下載並快取至本機。',
+                            style: TextStyle(fontSize: 12, color: Colors.orange, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      icon: const Icon(Icons.download),
+                      label: Text('📥 立即下載離線 AI 模型 (${offlineMgr.modelEstimatedSize})'),
+                      onPressed: () async {
+                        offlineMgr.downloadModel();
+                        setModalState(() {});
+                      },
+                    ),
+                  ),
+                ],
+
+                const Divider(height: 24),
+
+                // 離線模式開關
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('優先使用端側離線 AI 模型 (第 1 優先)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  subtitle: const Text(
+                    '開啟：優先於本機設備以 Gemma 4 2B 極速作答 (0 延遲、無網可用)\n'
+                    '關閉：優先調用雲端 Google 最新 Gemini 旗艦多模態模型',
+                    style: TextStyle(fontSize: 11.5),
+                  ),
+                  value: offlineMgr.preferOffline,
+                  onChanged: (val) async {
+                    await offlineMgr.setPreferOffline(val);
+                    setModalState(() {});
+                  },
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}

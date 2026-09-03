@@ -65,7 +65,7 @@ class AiTutorController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> sendUserMessage(String prompt, {Question? questionContext}) async {
+  Future<void> sendUserMessage(String prompt, {Question? questionContext, bool? forceCloud}) async {
     if (prompt.trim().isEmpty) return;
 
     final userMsg = ChatMessage(
@@ -83,16 +83,22 @@ class AiTutorController extends ChangeNotifier {
       final chunks = await ragRepository.searchChunks(prompt, limit: 3);
 
       final apiKey = userGeminiApiKey;
+      final offlineMgr = aiService.offlineModelManager;
+      final isPreferOffline = offlineMgr?.preferOffline ?? true;
+      final isForceCloud = forceCloud ?? (!isPreferOffline && apiKey != null && apiKey.isNotEmpty);
+
       final responseText = await aiService.askAiTutor(
         prompt: prompt,
         questionContext: questionContext,
         ragChunks: chunks,
         persona: _currentPersona,
         apiKey: apiKey,
+        forceCloud: isForceCloud,
       );
 
       final effectiveConfig = aiService.resolveEffectiveAiConfig();
       final isOffline = await aiService.isOffline();
+      final isCloudUsed = !isOffline && (apiKey != null && apiKey.isNotEmpty) && isForceCloud;
 
       _messages.add(
         ChatMessage(
@@ -100,9 +106,9 @@ class AiTutorController extends ChangeNotifier {
           text: responseText,
           isUser: false,
           timestamp: DateTime.now(),
-          modelBadge: (isOffline || apiKey == null || apiKey.isEmpty)
-              ? 'Gemma 4 (2B)'
-              : effectiveConfig.primaryModel,
+          modelBadge: isCloudUsed
+              ? effectiveConfig.primaryModel
+              : 'Gemma 4 (2B) 離線',
         ),
       );
     } catch (e) {

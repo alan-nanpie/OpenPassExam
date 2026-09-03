@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'ai_service.dart';
+import 'ai_offline_reasoning_engine.dart';
 
 enum OfflineModelStatus {
   notDownloaded,
@@ -122,42 +124,23 @@ class OfflineModelManager extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 本機端側直接推論
+  /// 本機端側直接推論 (針對學員提問動態深度解析)
   Future<String> runLocalInference({
     required String prompt,
     String? questionTitle,
     String? personaStyle,
   }) async {
-    // 模擬端側 LiteRT 4096 tokens 推論
-    await Future.delayed(const Duration(milliseconds: 600));
+    // 模擬端側 LiteRT 4096 tokens 推論延遲
+    await Future.delayed(const Duration(milliseconds: 300));
 
-    final sb = StringBuffer();
-    sb.writeln('⚡ **[端側 Gemma 4 (2B) / Web Nano 離線極速推論 - 第 1 優先模式]**\n');
-    sb.writeln('• **運算環境**：$platformSupportDescription');
-    sb.writeln('• **安全隱私**：本分析 100% 於您的終端設備本機推論完成，未發送任何請求至外部網路。\n');
+    final persona = personaStyle == 'cliEngineer'
+        ? AiPersona.cliEngineer
+        : (personaStyle == 'ccieArchitect' ? AiPersona.ccieArchitect : AiPersona.friendlyTutor);
 
-    if (questionTitle != null) {
-      sb.writeln('### 🎯 題目解析：$questionTitle\n');
-    }
-
-    sb.writeln('#### 1. 核心觀念生活化拆解');
-    sb.writeln('想像網路架構就像高鐵的聯外交通系統：');
-    sb.writeln('- 交換器 (Switch) 是車站內的電梯與各月台穿堂，負責精準將旅客送至特定車廂；');
-    sb.writeln('- 路由器 (Router) 則是高鐵的轉轍器與號誌行控中心，負責跨城市的大範圍最佳路徑導引。\n');
-
-    sb.writeln('#### 2. Cisco CLI 實戰指令');
-    sb.writeln('```cisco');
-    sb.writeln('Router# configure terminal');
-    sb.writeln('Router(config)# interface GigabitEthernet0/0/0');
-    sb.writeln('Router(config-if)# ip address 10.0.0.1 255.255.255.0');
-    sb.writeln('Router(config-if)# no shutdown');
-    sb.writeln('Router(config-if)# end');
-    sb.writeln('Router# show ip interface brief');
-    sb.writeln('```\n');
-
-    sb.writeln('#### 3. 考點陷阱提示');
-    sb.writeln('本考題常見陷阱在於子網路遮罩長度與廣播位址的邊界判定，請務必檢驗 Wildcard Mask 反向遮罩計算。');
-
-    return sb.toString();
+    return AiOfflineReasoningEngine.generateResponse(
+      prompt: prompt,
+      persona: persona,
+      platformDescription: platformSupportDescription,
+    );
   }
 }
