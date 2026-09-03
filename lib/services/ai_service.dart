@@ -147,7 +147,24 @@ class AiService {
           persona: persona,
           config: config,
         );
-        return '⚠️ **[雲端 API 連線異常，已由本機端側智能引擎接管推論]**\n\n$localAnswer';
+
+        String errorDiagnosis;
+        final errStr = e2.toString();
+        if (errStr.contains('API_KEY_INVALID') || errStr.contains('API key not valid')) {
+          errorDiagnosis = '您設定的 Google Gemini API Key 無效或尚未啟用。請點擊右上角金鑰圖示 🔑，至 [Google AI Studio](https://aistudio.google.com/) 免費重新建立並複製正確的金鑰。';
+        } else if (errStr.contains('PERMISSION_DENIED')) {
+          errorDiagnosis = '該 API Key 缺乏 Generative Language API 存取權限。';
+        } else if (errStr.contains('RESOURCE_EXHAUSTED')) {
+          errorDiagnosis = '該 Gemini API Key 今日配額已耗盡，請稍候重試或更換金鑰。';
+        } else if (errStr.contains('XMLHttpRequest') || errStr.contains('ClientException')) {
+          errorDiagnosis = '瀏覽器發送網路請求失敗（可能是網路連線不穩或受廣告攔截插件阻擋）。';
+        } else if (errStr.contains('TimeoutException')) {
+          errorDiagnosis = 'Google 雲端 API 伺服器連線逾時 (超過 15 秒)。';
+        } else {
+          errorDiagnosis = errStr;
+        }
+
+        return '⚠️ **[雲端 API 連線異常提示]**\n> 🔍 **診斷原因**：$errorDiagnosis\n> 🛡️ **已自動由本機端側智能引擎接管推論**\n\n$localAnswer';
       }
     }
   }
@@ -161,12 +178,14 @@ class AiService {
     List<RagKnowledgeChunk>? ragChunks,
     required AiPersona persona,
   }) async {
+    final cleanApiKey = apiKey.trim().replaceAll('"', '').replaceAll("'", '');
+
     // 支援官方 API 模型降級清單 (防止 futuristic 模型名稱 404 Model Not Found)
     final candidateModels = <String>{
       modelName,
       'gemini-2.5-flash',
-      'gemini-2.0-flash',
       'gemini-1.5-flash',
+      'gemini-2.0-flash',
     }.toList();
 
     Exception? lastException;
@@ -174,7 +193,7 @@ class AiService {
     for (final targetModel in candidateModels) {
       try {
         final url = Uri.parse(
-          'https://generativelanguage.googleapis.com/v1beta/models/$targetModel:generateContent?key=$apiKey',
+          'https://generativelanguage.googleapis.com/v1beta/models/$targetModel:generateContent?key=$cleanApiKey',
         );
 
         final systemInstruction = _buildSystemInstruction(persona, ragChunks);
@@ -280,6 +299,43 @@ class AiService {
       ragChunks: ragChunks,
       isSimulatedCloud: false,
     );
+  }
+
+  /// 驗證使用者輸入的 Gemini API Key 是否有效
+  Future<String?> testGeminiApiKey(String apiKey) async {
+    final cleanKey = apiKey.trim().replaceAll('"', '').replaceAll("'", '');
+    if (cleanKey.isEmpty) return 'API Key 不能為空';
+    try {
+      final url = Uri.parse(
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$cleanKey',
+      );
+      final body = jsonEncode({
+        'contents': [
+          {
+            'role': 'user',
+            'parts': [{'text': 'ping'}]
+          }
+        ],
+      });
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: body,
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        return null; // 成功無錯誤
+      }
+      try {
+        final json = jsonDecode(response.body);
+        final msg = json['error']?['message'] ?? 'HTTP ${response.statusCode}';
+        return msg.toString();
+      } catch (_) {
+        return 'HTTP ${response.statusCode}：${response.body}';
+      }
+    } catch (e) {
+      return e.toString();
+    }
   }
 
   String _generateSimulatedHighQualityResponse({

@@ -406,6 +406,9 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
   void _showApiKeyDialog(BuildContext context, AiTutorController aiCtrl) {
     final textController = TextEditingController(text: aiCtrl.userGeminiApiKey ?? '');
     var isObscured = true;
+    var isTestingKey = false;
+    String? testResult;
+    var isTestSuccess = false;
 
     showDialog(
       context: context,
@@ -461,6 +464,66 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 12),
+                // 測試連線按鈕與即時結果
+                Row(
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: isTestingKey
+                          ? null
+                          : () async {
+                              final inputKey = textController.text.trim();
+                              if (inputKey.isEmpty) {
+                                setState(() {
+                                  testResult = '請先輸入 API Key 後再點擊測試！';
+                                  isTestSuccess = false;
+                                });
+                                return;
+                              }
+                              setState(() {
+                                isTestingKey = true;
+                                testResult = null;
+                              });
+                              final err = await aiCtrl.testUserApiKey(inputKey);
+                              setState(() {
+                                isTestingKey = false;
+                                isTestSuccess = err == null;
+                                testResult = err == null
+                                    ? '✅ Google 雲端 API 連線成功！金鑰有效可用。'
+                                    : '❌ 驗證失敗：$err';
+                              });
+                            },
+                      icon: isTestingKey
+                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.bolt, size: 16),
+                      label: Text(isTestingKey ? '正在連線測試...' : '⚡ 測試金鑰有效性'),
+                    ),
+                  ],
+                ),
+                if (testResult != null) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isTestSuccess
+                          ? Colors.green.withValues(alpha: 0.1)
+                          : Colors.red.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: isTestSuccess ? Colors.green : Colors.red,
+                        width: 0.8,
+                      ),
+                    ),
+                    child: Text(
+                      testResult!,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: isTestSuccess ? Colors.green.shade700 : Colors.red.shade700,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

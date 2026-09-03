@@ -73,5 +73,19 @@ void main() {
       expect(response.contains('IP'), true);
       expect(response.contains('TCP'), true);
     });
+
+    test('當學員詢問「OSPF 指令」時，引擎能完整輸出 Cisco 配置與 show ip ospf neighbor 排錯指令', () {
+      final response = AiOfflineReasoningEngine.generateResponse(
+        prompt: 'OSPF 指令',
+        persona: AiPersona.friendlyTutor,
+      );
+
+      expect(response.contains('OSPF'), true);
+      expect(response.contains('router ospf'), true);
+      expect(response.contains('network'), true);
+      expect(response.contains('show ip ospf neighbor'), true);
+      expect(response.contains('show ip route ospf'), true);
+      expect(response.contains('Area 0'), true);
+    });
   });
 }

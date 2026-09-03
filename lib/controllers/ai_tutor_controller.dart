@@ -60,6 +60,10 @@ class AiTutorController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<String?> testUserApiKey(String key) async {
+    return await aiService.testGeminiApiKey(key);
+  }
+
   void setPersona(AiPersona persona) {
     _currentPersona = persona;
     notifyListeners();

@@ -119,21 +119,88 @@ class AiOfflineReasoningEngine {
       return;
     }
 
-    // OSPF / 路由協定
-    if (lower.contains('ospf') || lower.contains('bgp') || lower.contains('eigrp') || lower.contains('route') || lower.contains('路由')) {
-      sb.writeln('**動態路由協定剖析**：');
-      sb.writeln('- **OSPF (Open Shortest Path First)**：屬於鏈路狀態協定 (Link-State)，使用 Dijkstra 演算法計算最短路徑樹 (SPF)。');
-      sb.writeln('- **階層式區域設計**：必須具備骨幹區域 **Area 0**，所有非骨幹區域（Area 1, 2...）皆必須直接或透過虛擬鏈路 (Virtual-Link) 連接至 Area 0 以防止路由迴圈。');
-      sb.writeln('- **鄰居建立五大條件**：兩端介面必須符合相同 Subnet Mask、相同 Hello/Dead 間隔、相同 Area ID、相容的認證設定，且 MTU 大小一致。');
+    // OSPF 路由協定與實戰指令
+    if (lower.contains('ospf')) {
+      sb.writeln('**OSPF (Open Shortest Path First) 核心架構與實戰指令全解析**：\n');
+      sb.writeln('- **協定本質**：屬於內部閘道協定 (IGP) 之鏈路狀態協定 (Link-State)，以 Dijkstra 演算法計算最短路徑樹 (SPF)，Administrative Distance (AD) 值為 **110**。');
+      sb.writeln('- **階層區域**：骨幹區域必為 **Area 0**，所有非骨幹區域必須直接與 Area 0 相連；跨區域路由器稱為 ABR，連接外部 AS 稱為 ASBR。\n');
+
+      sb.writeln('#### 🛠️ Cisco IOS OSPF 完整配置步驟與指令');
+      sb.writeln('```cisco');
+      sb.writeln('! 1. 進入特權與全域模式，啟用 OSPF 進程 (進程 ID 僅具本機意義)');
+      sb.writeln('Router# configure terminal');
+      sb.writeln('Router(config)# router ospf 1');
+      sb.writeln('');
+      sb.writeln('! 2. 手動指派 Router ID (強烈建議配置，選舉優先權最高)');
+      sb.writeln('Router(config-router)# router-id 1.1.1.1');
+      sb.writeln('');
+      sb.writeln('! 3. 宣告網段與對應區域 Area (使用反向遮罩 Wildcard Mask)');
+      sb.writeln('Router(config-router)# network 192.168.1.0 0.0.0.255 area 0');
+      sb.writeln('Router(config-router)# network 10.0.0.0 0.0.0.3 area 0');
+      sb.writeln('');
+      sb.writeln('! 4. (推薦現代作法) 亦可直接在特定介面啟用 OSPF (精準且不易出錯)');
+      sb.writeln('Router(config)# interface GigabitEthernet0/0/0');
+      sb.writeln('Router(config-if)# ip ospf 1 area 0');
+      sb.writeln('Router(config-if)# exit');
+      sb.writeln('');
+      sb.writeln('! 5. 最佳實務：配置被動介面 (防止向用戶端 LAN 網段泛洪 Hello 封包)');
+      sb.writeln('Router(config)# router ospf 1');
+      sb.writeln('Router(config-router)# passive-interface GigabitEthernet0/0/1');
+      sb.writeln('Router(config-router)# exit');
+      sb.writeln('```\n');
+
+      sb.writeln('#### 🔍 OSPF 關鍵驗證與排錯指令 (考試必考 Show 指令)');
+      sb.writeln('```cisco');
+      sb.writeln('Router# show ip ospf neighbor          ! 檢視鄰居狀態 (正常應為 FULL/DR 或 FULL/BDR)');
+      sb.writeln('Router# show ip route ospf             ! 檢視路由表中的 OSPF 路由 (代碼標記為 O)');
+      sb.writeln('Router# show ip ospf interface brief   ! 檢視各介面 Process ID、Area、Cost 及角色');
+      sb.writeln('Router# show ip ospf database          ! 檢視鏈路狀態資料庫 (LSDB) 與各類 LSA');
+      sb.writeln('Router# clear ip ospf process          ! 重設 OSPF 進程以重新建立鄰居 (需輸入 yes)');
+      sb.writeln('```\n');
+
+      sb.writeln('#### ⚡ 鄰居無法建立 (Neighbor Down) 五大排錯核心');
+      sb.writeln('1. **Area ID 不匹配**：雙方介面所屬的 Area 必須完全一致。');
+      sb.writeln('2. **子網路遮罩不匹配**：在廣播網段上雙方 IP 必須處於同一 Subnet。');
+      sb.writeln('3. **Hello / Dead Timer 不相符**：預設為 10 秒 / 40 秒，雙方必須一致。');
+      sb.writeln('4. **認證密碼不相符**：若啟用 MD5 或 SHA 認證，兩端金鑰必須相符。');
+      sb.writeln('5. **MTU 大小不一致**：會導致狀態卡在 `EXSTART / EXCHANGE` 無法進入 `FULL`。');
+      return;
+    }
+
+    // BGP / EIGRP 路由協定
+    if (lower.contains('bgp') || lower.contains('eigrp') || lower.contains('route') || lower.contains('路由')) {
+      sb.writeln('**進階動態路由協定剖析**：');
+      sb.writeln('- **BGP (Border Gateway Protocol)**：網際網路骨幹之路徑向量協定 (Path Vector)，AD 值為 20 (eBGP) / 200 (iBGP)，以 AS-Path 防範迴圈。');
+      sb.writeln('```cisco');
+      sb.writeln('Router(config)# router bgp 65000');
+      sb.writeln('Router(config-router)# neighbor 192.0.2.1 remote-as 65001');
+      sb.writeln('Router# show ip bgp summary');
+      sb.writeln('```');
       return;
     }
 
     // VLAN / STP / 交換技術
     if (lower.contains('vlan') || lower.contains('stp') || lower.contains('trunk') || lower.contains('switch') || lower.contains('交換器') || lower.contains('802.1q')) {
-      sb.writeln('**第二層交換技術與廣播網域隔離**：');
-      sb.writeln('- **VLAN (虛擬區域網路)**：將單一實體交換器切割為多個邏輯廣播網域 (Broadcast Domain)，提升安全性並抑制無謂的廣播泛洪。');
+      sb.writeln('**第二層交換技術與實戰指令全解析**：\n');
+      sb.writeln('- **VLAN (虛擬區域網路)**：將單一實體交換器切割為多個邏輯**廣播網域** (Broadcast Domain)，提升安全性並抑制無謂的廣播泛洪。');
       sb.writeln('- **Trunk 幹線與 802.1Q 標記**：用於在多台交換器之間傳遞多個 VLAN 封包，在乙太網路訊框加入 4 Bytes 的 802.1Q 標籤（包含 12-bit VLAN ID）。');
-      sb.writeln('- **STP (Spanning Tree Protocol)**：透過阻塞備援線路阻絕廣播風暴 (Broadcast Storm)，當主要鏈路斷線時自動切換。');
+      sb.writeln('- **STP (Spanning Tree Protocol)**：透過阻塞備援線路阻絕廣播風暴 (Broadcast Storm)，當主要鏈路斷線時自動切換。\n');
+      sb.writeln('```cisco');
+      sb.writeln('! 1. 建立 VLAN 並命名');
+      sb.writeln('Switch(config)# vlan 10');
+      sb.writeln('Switch(config-vlan)# name Engineering');
+      sb.writeln('! 2. 指派 Access 連接埠至指定 VLAN');
+      sb.writeln('Switch(config)# interface GigabitEthernet0/1');
+      sb.writeln('Switch(config-if)# switchport mode access');
+      sb.writeln('Switch(config-if)# switchport access vlan 10');
+      sb.writeln('! 3. 配置 Trunk 幹線與 802.1Q 封裝');
+      sb.writeln('Switch(config)# interface GigabitEthernet0/24');
+      sb.writeln('Switch(config-if)# switchport mode trunk');
+      sb.writeln('Switch(config-if)# switchport trunk allowed vlan 10,20,30');
+      sb.writeln('! 4. 驗證指令');
+      sb.writeln('Switch# show vlan brief');
+      sb.writeln('Switch# show interfaces trunk');
+      sb.writeln('```');
       return;
     }
 
@@ -181,6 +248,33 @@ class AiOfflineReasoningEngine {
   }
 
   static void _generateCliGuide(StringBuffer sb, String lower) {
+    if (lower.contains('ospf')) {
+      sb.writeln('```cisco');
+      sb.writeln('! === OSPF 進階參數微調與深入除錯 ===');
+      sb.writeln('Router(config)# interface GigabitEthernet0/0/0');
+      sb.writeln('Router(config-if)# ip ospf cost 10            ! 手動指定介面 Metric (覆蓋自動計算)');
+      sb.writeln('Router(config-if)# ip ospf priority 255       ! 將優先級調至最高 (確保競選為 DR)');
+      sb.writeln('Router(config-if)# ip ospf hello-interval 10   ! 調整 Hello 間隔 (兩端必須相同)');
+      sb.writeln('Router(config-if)# exit');
+      sb.writeln('! 排錯即時除錯指令：');
+      sb.writeln('Router# debug ip ospf adj                     ! 追蹤鄰居建立交握 (Adjacency) 過程');
+      sb.writeln('Router# debug ip ospf events                  ! 追蹤 SPF 計算與 LSA 泛洪事件');
+      sb.writeln('Router# undebug all                           ! 排錯完畢務必關閉除錯');
+      sb.writeln('```');
+      return;
+    }
+
+    if (lower.contains('vlan') || lower.contains('trunk') || lower.contains('switch')) {
+      sb.writeln('```cisco');
+      sb.writeln('! === VLAN & Trunk 進階驗證與除錯 ===');
+      sb.writeln('Switch# show mac address-table dynamic vlan 10');
+      sb.writeln('Switch# show interfaces trunk');
+      sb.writeln('Switch# show interfaces GigabitEthernet0/24 switchport');
+      sb.writeln('Switch# show dtp                              ! 檢查動態中繼協定狀態');
+      sb.writeln('```');
+      return;
+    }
+
     sb.writeln('```cisco');
     sb.writeln('! 1. 進入特權與全域設定模式');
     sb.writeln('Device# configure terminal');
