@@ -9,5 +9,12 @@ windows/
 macos/
 linux/
 docs_opensource/
+app_docs/
 test/
 *.log
+*.env
+.env*
+deploy.env
+scripts/deploy.env
+scripts/*.env
+secrets*

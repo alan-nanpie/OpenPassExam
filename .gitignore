@@ -21,6 +21,14 @@ GoogleService-Info*.plist
 *firebase-adminsdk*.json
 *.env
 .env*
+deploy.env
+deploy.*.env
+deploy.config.ps1
+deploy.*.ps1
+*.local.ps1
+scripts/deploy.env
+scripts/*.env
+scripts/*.local.ps1
 *.pem
 *.key
 *.p12
