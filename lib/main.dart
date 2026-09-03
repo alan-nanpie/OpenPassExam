@@ -23,6 +23,7 @@ import 'services/remote_config_service.dart';
 import 'services/ai_service.dart';
 import 'services/offline_model_manager.dart';
 import 'services/play_billing_service.dart';
+import 'services/secure_vault_service.dart';
 
 import 'controllers/auth_controller.dart';
 import 'controllers/theme_locale_controller.dart';
@@ -49,7 +50,8 @@ void main() async {
 
   // 2. 初始化持久化儲存與基礎資料來源
   final prefs = await SharedPreferences.getInstance();
-  final localCache = LocalPersistentCache(prefs);
+  final secureVault = SecureVaultService();
+  final localCache = LocalPersistentCache(prefs, secureVault);
   final rtdbDatasource = RtdbApprovedKeysDatasource();
   final connectivity = Connectivity();
 

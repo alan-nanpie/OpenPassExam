@@ -9,11 +9,13 @@ import '../models/study_artifact.dart';
 import '../models/ai_model_config.dart';
 import '../models/question_comment.dart';
 import '../models/exam_subject.dart';
+import '../../services/secure_vault_service.dart';
 
 class LocalPersistentCache {
   final SharedPreferences _prefs;
+  final ISecureVaultService? _secureVault;
 
-  LocalPersistentCache(this._prefs);
+  LocalPersistentCache(this._prefs, [this._secureVault]);
 
   // 1. 考題快取
   Future<void> saveQuestions(String examId, List<Question> questions) async {
@@ -147,9 +149,13 @@ class LocalPersistentCache {
     await _prefs.remove(AppConstants.prefKeyAiConfigOverride);
   }
 
-  // 8. 使用者自備 Gemini API 金鑰 (BYOK)
+  // 8. 使用者自備 Gemini API 金鑰 (BYOK) - 雙層硬體安全保護
   Future<void> saveUserGeminiApiKey(String apiKey) async {
-    await _prefs.setString(AppConstants.prefKeyUserGeminiApiKey, apiKey.trim());
+    final trimmed = apiKey.trim();
+    if (_secureVault != null) {
+      await _secureVault.writeSecret(AppConstants.prefKeyUserGeminiApiKey, trimmed);
+    }
+    await _prefs.setString(AppConstants.prefKeyUserGeminiApiKey, trimmed);
   }
 
   String? getUserGeminiApiKey() {
@@ -158,7 +164,18 @@ class LocalPersistentCache {
     return key.trim();
   }
 
+  Future<String?> getSecureUserGeminiApiKey() async {
+    if (_secureVault != null) {
+      final secret = await _secureVault.readSecret(AppConstants.prefKeyUserGeminiApiKey);
+      if (secret != null && secret.isNotEmpty) return secret;
+    }
+    return getUserGeminiApiKey();
+  }
+
   Future<void> clearUserGeminiApiKey() async {
+    if (_secureVault != null) {
+      await _secureVault.deleteSecret(AppConstants.prefKeyUserGeminiApiKey);
+    }
     await _prefs.remove(AppConstants.prefKeyUserGeminiApiKey);
   }
 
