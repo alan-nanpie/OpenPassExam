@@ -16,7 +16,7 @@ class AiModelConfig {
   final AiConfigLayer sourceLayer;
 
   AiModelConfig({
-    this.primaryModel = 'gemini-3.8-flash',
+    this.primaryModel = 'gemini-2.5-flash',
     this.fallbackModel = 'gemini-2.5-flash',
     this.onDeviceModel = 'gemma-4-2b',
     this.temperature = 1.0,
@@ -41,7 +41,7 @@ class AiModelConfig {
 
   factory AiModelConfig.fromMap(Map<String, dynamic> map, {AiConfigLayer layer = AiConfigLayer.builtInDefault}) {
     return AiModelConfig(
-      primaryModel: (map['primary_model'] ?? map['primaryModel'] ?? 'gemini-3.8-flash').toString(),
+      primaryModel: (map['primary_model'] ?? map['primaryModel'] ?? 'gemini-2.5-flash').toString(),
       fallbackModel: (map['fallback_model'] ?? map['fallbackModel'] ?? 'gemini-2.5-flash').toString(),
       onDeviceModel: (map['on_device_model'] ?? map['onDeviceModel'] ?? 'gemma-4-2b').toString(),
       temperature: (map['temperature'] as num?)?.toDouble() ?? 1.0,

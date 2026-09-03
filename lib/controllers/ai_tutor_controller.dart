@@ -89,7 +89,8 @@ class AiTutorController extends ChangeNotifier {
       final apiKey = userGeminiApiKey;
       final offlineMgr = aiService.offlineModelManager;
       final isPreferOffline = offlineMgr?.preferOffline ?? true;
-      final isForceCloud = forceCloud ?? (!isPreferOffline && apiKey != null && apiKey.isNotEmpty);
+      // 當使用者關閉「離線優先」開關時，視為要求使用雲端模式
+      final isForceCloud = forceCloud ?? !isPreferOffline;
 
       final responseText = await aiService.askAiTutor(
         prompt: prompt,

@@ -94,9 +94,23 @@ class AiService {
     final isPreferOffline = offlineModelManager?.preferOffline ?? config.preferOffline;
     final hasApiKey = apiKey != null && apiKey.trim().isNotEmpty;
 
+    // === 使用者明確要求雲端模式但沒有填入 API Key ===
+    if (forceCloud && !hasApiKey) {
+      return '⚠️ **[雲端模式需要 Gemini API Key]**\n\n'
+          '您目前選擇了雲端 Gemini 旗艦推論模式，但尚未設定 API Key。\n\n'
+          '**如何啟用雲端模式（3 步驟、100% 免費）**：\n'
+          '1. 點擊右上角 🔑 **金鑰圖示**，或點擊上方黃色提示列\n'
+          '2. 開啟 [Google AI Studio](https://aistudio.google.com/app/apikey)，以 Google 帳號登入\n'
+          '3. 點擊「Create API Key」→ 複製 `AIzaSy...` 開頭的金鑰 → 貼回本 App\n\n'
+          '> 📌 金鑰只存放在您的瀏覽器本機快取中，絕不上傳至任何伺服器！\n\n'
+          '---\n'
+          '🛡️ **以下由本機端側智能引擎為您即時回答：**\n\n'
+          '${_generateOnDeviceGemmaResponse(prompt: prompt, question: questionContext, persona: persona, ragChunks: ragChunks)}';
+    }
+
     // === 【第 1 優先】：端側離線 AI 模型 (Gemma 4 2B / Chrome Nano) ===
-    // 觸發時機：設備離線、未設定 API Key、或使用者手動勾選「優先使用離線模型」且未強制雲端
-    if (offline || !hasApiKey || (!forceCloud && isPreferOffline && offlineReady)) {
+    // 觸發時機：設備離線、未設定 API Key 且未強制雲端、或使用者手動勾選「優先使用離線模型」且未強制雲端
+    if (offline || (!forceCloud && !hasApiKey) || (!forceCloud && isPreferOffline && offlineReady)) {
       if (offlineModelManager != null && offlineModelManager!.isModelReady) {
         return await offlineModelManager!.runLocalInference(
           prompt: prompt,
@@ -117,7 +131,7 @@ class AiService {
       final cloudResponse = await _callGeminiMultimodalApi(
         modelName: config.primaryModel, // 例如 gemini-3.8-flash 或 gemini-2.5-flash
         prompt: prompt,
-        apiKey: apiKey.trim(),
+        apiKey: (apiKey ?? '').trim(),
         config: config,
         question: questionContext,
         ragChunks: ragChunks,
@@ -130,7 +144,7 @@ class AiService {
         final fallbackResponse = await _callGeminiMultimodalApi(
           modelName: config.fallbackModel, // 預設 gemini-2.5-flash
           prompt: prompt,
-          apiKey: apiKey.trim(),
+          apiKey: (apiKey ?? '').trim(),
           config: config,
           question: questionContext,
           ragChunks: ragChunks,
@@ -180,12 +194,12 @@ class AiService {
   }) async {
     final cleanApiKey = apiKey.trim().replaceAll('"', '').replaceAll("'", '');
 
-    // 支援官方 API 模型降級清單 (防止 futuristic 模型名稱 404 Model Not Found)
+    // 支援官方 API 模型降級清單
+    // gemini-2.0-flash 已於 2026/6/1 正式停用，僅保留可用模型
     final candidateModels = <String>{
       modelName,
       'gemini-2.5-flash',
       'gemini-1.5-flash',
-      'gemini-2.0-flash',
     }.toList();
 
     Exception? lastException;
@@ -237,7 +251,7 @@ class AiService {
           url,
           headers: {'Content-Type': 'application/json'},
           body: body,
-        ).timeout(const Duration(seconds: 15));
+        ).timeout(const Duration(seconds: 30));
 
         if (response.statusCode == 200) {
           final json = jsonDecode(response.body);

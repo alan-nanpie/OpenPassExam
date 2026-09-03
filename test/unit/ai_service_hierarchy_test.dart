@@ -32,7 +32,7 @@ void main() {
 
     test('預設應解析出 Remote Config / 預設配置層級', () {
       final config = aiService.resolveEffectiveAiConfig();
-      expect(config.primaryModel, 'gemini-3.7-flash');
+      expect(config.primaryModel, 'gemini-2.5-flash');
       expect(config.sourceLayer, AiConfigLayer.remoteConfig);
     });
 

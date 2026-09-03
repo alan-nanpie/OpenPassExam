@@ -122,7 +122,7 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
                                 ? '📥 正在下載端側模型 (${(offlineMgr.downloadProgress * 100).toInt()}%)'
                                 : (isOfflinePreferred
                                     ? (isReady ? '⚡ 模式：端側離線推論 (Gemma 4 2B 已就緒)' : '⚡ 模式：端側離線 (尚未下載完整模型)')
-                                    : (aiCtrl.hasUserApiKey ? '☁️ 模式：Google 雲端 Gemini 旗艦推論' : '☁️ 模式：雲端模式 (未填 Key 自動轉端側)')),
+                                    : (aiCtrl.hasUserApiKey ? '☁️ 模式：Google 雲端 Gemini 旗艦推論 (gemini-2.5-flash)' : '⚠️ 雲端模式：尚未設定 API Key → 點此設定')),
                             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                             overflow: TextOverflow.ellipsis,
                           ),
