@@ -5,6 +5,8 @@ import '../../core/constants/app_constants.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../core/widgets/safe_image_widget.dart';
 import '../../core/widgets/question_image_reference_dialog.dart';
+import '../../core/widgets/enhanced_security_watermark.dart';
+import '../../core/security/secure_screen_service.dart';
 import '../../controllers/auth_controller.dart';
 import '../../controllers/mock_exam_controller.dart';
 import 'exam_timer_widget.dart';
@@ -22,6 +24,12 @@ class MockExamScreen extends StatefulWidget {
 class _MockExamScreenState extends State<MockExamScreen> {
   int _selectedQuestionCount = 10;
   bool _isExamStarted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    SecureScreenService.enableSecureScreen();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -130,6 +138,8 @@ class _MockExamScreenState extends State<MockExamScreen> {
 
   Widget _buildActiveExamScreen(BuildContext context) {
     final mockCtrl = context.watch<MockExamController>();
+    final authCtrl = context.watch<AuthController>();
+    final user = authCtrl.currentUser;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final question = mockCtrl.currentQuestion;
@@ -160,9 +170,12 @@ class _MockExamScreenState extends State<MockExamScreen> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
+      body: EnhancedSecurityWatermark(
+        userId: user?.uid ?? 'usr_guest',
+        userName: user?.displayName ?? 'PassExam 考生',
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
           // 考點標籤
           Text(
             '【${question.topic}】',
@@ -250,6 +263,7 @@ class _MockExamScreenState extends State<MockExamScreen> {
             );
           }),
         ],
+      ),
       ),
       bottomNavigationBar: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),

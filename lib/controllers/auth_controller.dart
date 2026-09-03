@@ -7,17 +7,44 @@ class AuthController extends ChangeNotifier {
   AppUser? _currentUser;
   bool _isLoading = false;
 
+  bool _hasDeviceConflict = false;
+
   AuthController({required this.userRepository});
 
   AppUser? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
   bool get isLoggedIn => _currentUser != null;
+  bool get hasDeviceConflict => _hasDeviceConflict;
 
   Future<void> initialize() async {
     _isLoading = true;
     notifyListeners();
     _currentUser = await userRepository.getCurrentUser();
+    await checkDeviceBinding();
     _isLoading = false;
+    notifyListeners();
+  }
+
+  Future<bool> checkDeviceBinding() async {
+    if (_currentUser == null) {
+      _hasDeviceConflict = false;
+      return false;
+    }
+    final currentLocalDeviceId = await userRepository.getOrGenerateDeviceId();
+    final conflict = _currentUser!.activeDeviceId.isNotEmpty &&
+        _currentUser!.activeDeviceId != currentLocalDeviceId;
+    _hasDeviceConflict = conflict;
+    notifyListeners();
+    return conflict;
+  }
+
+  Future<void> rebindDevice() async {
+    if (_currentUser == null) return;
+    final currentLocalDeviceId = await userRepository.getOrGenerateDeviceId();
+    final updated = _currentUser!.copyWith(activeDeviceId: currentLocalDeviceId);
+    await userRepository.saveUser(updated);
+    _currentUser = updated;
+    _hasDeviceConflict = false;
     notifyListeners();
   }
 
@@ -25,6 +52,7 @@ class AuthController extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
     _currentUser = await userRepository.getCurrentUser();
+    await checkDeviceBinding();
     _isLoading = false;
     notifyListeners();
   }
@@ -44,6 +72,7 @@ class AuthController extends ChangeNotifier {
     );
     await userRepository.saveUser(user);
     _currentUser = user;
+    _hasDeviceConflict = false;
     _isLoading = false;
     notifyListeners();
   }
@@ -57,6 +86,7 @@ class AuthController extends ChangeNotifier {
 
   Future<void> logout() async {
     _currentUser = null;
+    _hasDeviceConflict = false;
     notifyListeners();
   }
 }

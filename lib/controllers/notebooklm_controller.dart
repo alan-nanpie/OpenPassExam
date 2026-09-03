@@ -71,10 +71,12 @@ class NotebookLMController extends ChangeNotifier {
     }
     prompt.writeln('請使用標準 Markdown 排版，包含表格 (Markdown Tables)、重點標籤與清晰階層。');
 
+    final userApiKey = localCache.getUserGeminiApiKey();
     final content = await aiService.askAiTutor(
       prompt: prompt.toString(),
       ragChunks: _loadedChunks.take(3).toList(),
       persona: AiPersona.friendlyTutor,
+      apiKey: userApiKey,
     );
 
     final artifact = StudyArtifact(

@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
+import '../core/utils/ntp_time_helper.dart';
 import '../data/datasources/local_persistent_cache.dart';
 import '../data/models/exam_session.dart';
 import '../data/models/question.dart';
+import '../data/models/wrong_question.dart';
 import '../data/repositories/repository_factory.dart';
 
 class MockExamController extends ChangeNotifier {
@@ -121,10 +123,15 @@ class MockExamController extends ChangeNotifier {
     _isExamCompleted = true;
     final endTime = DateTime.now();
 
+    // NTP 防作弊網路時間驗證
+    final isTampered = await NtpTimeHelper.isSystemTimeTampered();
+    final isNtpVerified = !isTampered;
+
     int correctCount = 0;
     final Map<String, int> domainTotal = {};
     final Map<String, int> domainCorrect = {};
     final List<ExamAnswer> answers = [];
+    final List<Question> wrongQuestionsToRecord = [];
 
     for (int i = 0; i < _examQuestions.length; i++) {
       final q = _examQuestions[i];
@@ -132,7 +139,11 @@ class MockExamController extends ChangeNotifier {
       final correct = List<int>.from(q.correctAnswer)..sort();
       final isCorrect = listEquals(selected, correct);
 
-      if (isCorrect) correctCount++;
+      if (isCorrect) {
+        correctCount++;
+      } else {
+        wrongQuestionsToRecord.add(q);
+      }
 
       // 領域統計
       domainTotal[q.topic] = (domainTotal[q.topic] ?? 0) + 1;
@@ -148,6 +159,37 @@ class MockExamController extends ChangeNotifier {
           timeSpentSeconds: 0,
         ),
       );
+    }
+
+    // 自動收集錯題至錯題本集合中
+    if (wrongQuestionsToRecord.isNotEmpty) {
+      final existingWrongList = localCache.getWrongQuestions();
+      for (final q in wrongQuestionsToRecord) {
+        final existingIdx = existingWrongList.indexWhere((w) => w.questionId == q.id);
+        if (existingIdx >= 0) {
+          final current = existingWrongList[existingIdx];
+          existingWrongList[existingIdx] = current.copyWith(
+            wrongCount: current.wrongCount + 1,
+            lastWrongTime: DateTime.now(),
+            isMastered: false,
+            cachedQuestion: q,
+          );
+        } else {
+          existingWrongList.insert(
+            0,
+            WrongQuestion(
+              questionId: q.id,
+              examId: q.examId,
+              topic: q.topic,
+              wrongCount: 1,
+              lastWrongTime: DateTime.now(),
+              isMastered: false,
+              cachedQuestion: q,
+            ),
+          );
+        }
+      }
+      await localCache.saveWrongQuestions(existingWrongList);
     }
 
     final scorePercentage = _examQuestions.isNotEmpty
@@ -173,6 +215,7 @@ class MockExamController extends ChangeNotifier {
       isPassed: isPassed,
       domainBreakdown: domainBreakdown,
       answers: answers,
+      isNtpVerified: isNtpVerified,
     );
 
     _lastCompletedSession = session;

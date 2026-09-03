@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:passexam/core/constants/app_constants.dart';
 import 'package:passexam/data/datasources/local_persistent_cache.dart';
 import 'package:passexam/data/datasources/rtdb_approved_keys_datasource.dart';
 import 'package:passexam/data/repositories/repository_factory.dart';

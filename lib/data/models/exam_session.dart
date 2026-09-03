@@ -42,6 +42,7 @@ class ExamSession {
   final bool isPassed;
   final Map<String, double> domainBreakdown; // 領域得分率
   final List<ExamAnswer> answers;
+  final bool isNtpVerified;
 
   ExamSession({
     required this.id,
@@ -55,6 +56,7 @@ class ExamSession {
     required this.isPassed,
     required this.domainBreakdown,
     required this.answers,
+    this.isNtpVerified = true,
   });
 
   Map<String, dynamic> toMap() {
@@ -70,6 +72,7 @@ class ExamSession {
       'isPassed': isPassed,
       'domainBreakdown': domainBreakdown,
       'answers': answers.map((a) => a.toMap()).toList(),
+      'isNtpVerified': isNtpVerified,
     };
   }
 
@@ -92,6 +95,7 @@ class ExamSession {
               ?.map((a) => ExamAnswer.fromMap(a as Map<String, dynamic>))
               .toList() ??
           [],
+      isNtpVerified: map['isNtpVerified'] ?? true,
     );
   }
 }

@@ -71,11 +71,29 @@ class _SearchScreenState extends State<SearchScreen> {
                 Row(
                   children: [
                     FilterChip(
-                      label: const Text('僅看有拓撲圖'),
+                      avatar: Icon(
+                        searchCtrl.isSemanticVectorMode ? Icons.psychology : Icons.search,
+                        size: 16,
+                        color: searchCtrl.isSemanticVectorMode ? Colors.white : null,
+                      ),
+                      label: Text(
+                        searchCtrl.isSemanticVectorMode ? 'Vertex AI 語意向量模式' : '關鍵字搜尋',
+                      ),
+                      selected: searchCtrl.isSemanticVectorMode,
+                      selectedColor: AppColors.primary,
+                      labelStyle: TextStyle(
+                        color: searchCtrl.isSemanticVectorMode ? Colors.white : null,
+                        fontWeight: searchCtrl.isSemanticVectorMode ? FontWeight.bold : null,
+                      ),
+                      onSelected: (v) => searchCtrl.toggleSemanticVectorMode(v),
+                    ),
+                    const SizedBox(width: 8),
+                    FilterChip(
+                      label: const Text('僅看有圖'),
                       selected: searchCtrl.onlyWithImage,
                       onSelected: (v) => searchCtrl.toggleOnlyWithImage(v),
                     ),
-                    const SizedBox(width: 10),
+                    const Spacer(),
                     DropdownButton<String>(
                       value: searchCtrl.selectedTypeFilter ?? 'ALL',
                       underline: const SizedBox.shrink(),

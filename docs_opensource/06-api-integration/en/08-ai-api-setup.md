@@ -1,9 +1,10 @@
 # Google AI API (Gemini 3.7 Flash & Gemma 4) Setup Guide
 
-## 1. Google Gemini 3.7 Flash API Setup
-- Retrieve your API key from [Google AI Studio](https://aistudio.google.com/).
+## 1. Google Gemini 3.7 Flash API & BYOK (Bring Your Own Key) Setup
+- Users can obtain their free API key from [Google AI Studio (aistudio.google.com)](https://aistudio.google.com/app/apikey).
 - **Gemini 3.7 Flash** delivers Dynamic Thinking hybrid reasoning with adaptive budget and pedagogical explanations.
-- Set `GEMINI_API_KEY` in `secrets.json` or Google Secret Manager.
+- **BYOK Architecture**: The API key is stored strictly on the user's client device (SharedPreferences / LocalStorage) and is never transmitted to servers or committed to repositories.
+- If no key is configured, the application gracefully falls back to on-device Gemma 4 and curated seed explanations.
 
 ## 2. On-Device Offline Google Gemma 4 (2B) LiteRT Setup
 - Gemma 4 2B operates with a 4096-token budget via LiteRT on Android.

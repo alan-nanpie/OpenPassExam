@@ -141,11 +141,50 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildHomeDashboard(BuildContext context) {
     final examCtrl = context.watch<ExamController>();
+    final auth = context.watch<AuthController>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       children: [
+        // 裝置綁定安全提醒 Banner
+        if (auth.hasDeviceConflict)
+          Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.amber.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.amber),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.phonelink_lock, color: Colors.orange, size: 28),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '⚠️ 偵測到帳號在其他裝置登入',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        '為維護安全防護，單一帳號僅允許綁定一台設備。點擊右側以將當前設備設為唯一授權裝置。',
+                        style: TextStyle(fontSize: 11.5),
+                      ),
+                    ],
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => auth.rebindDevice(),
+                  child: const Text('重新綁定', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          ),
+
         // 歡迎與橫幅 Banner
         _buildHeroBanner(context),
         const SizedBox(height: 16),

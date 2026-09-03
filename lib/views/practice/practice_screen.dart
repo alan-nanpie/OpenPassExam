@@ -6,6 +6,8 @@ import '../../controllers/auth_controller.dart';
 import '../../controllers/exam_controller.dart';
 import '../../controllers/ai_tutor_controller.dart';
 import '../../controllers/notes_controller.dart';
+import '../../data/models/question.dart';
+import '../../services/tts_voice_service.dart';
 import '../ai_tutor/ai_tutor_screen.dart';
 import 'question_card_widget.dart';
 import 'english_learning_card_widget.dart';
@@ -20,6 +22,9 @@ class PracticeScreen extends StatefulWidget {
 }
 
 class _PracticeScreenState extends State<PracticeScreen> {
+  final TtsVoiceService _ttsService = TtsVoiceService();
+  bool _isTtsPlaying = false;
+
   @override
   void initState() {
     super.initState();
@@ -29,6 +34,28 @@ class _PracticeScreenState extends State<PracticeScreen> {
         examCtrl.loadQuestionsForSubject(widget.subjectId);
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _ttsService.stop();
+    super.dispose();
+  }
+
+  Future<void> _toggleTts(Question question) async {
+    if (_isTtsPlaying) {
+      await _ttsService.stop();
+      if (mounted) setState(() => _isTtsPlaying = false);
+    } else {
+      final optionsText = question.options.asMap().entries.map((e) {
+        final optChar = String.fromCharCode(65 + e.key);
+        return '選項 $optChar：${e.value}。';
+      }).join(' ');
+
+      final textToRead = '題目：${question.title}。$optionsText';
+      await _ttsService.speak(textToRead);
+      if (mounted) setState(() => _isTtsPlaying = true);
+    }
   }
 
   @override
@@ -54,6 +81,13 @@ class _PracticeScreenState extends State<PracticeScreen> {
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         actions: [
+          // 語音朗讀 (TTS) 按鈕
+          IconButton(
+            icon: Icon(_isTtsPlaying ? Icons.volume_up : Icons.volume_up_outlined),
+            color: _isTtsPlaying ? AppColors.primary : null,
+            tooltip: _isTtsPlaying ? '停止朗讀' : '語音朗讀考題',
+            onPressed: question == null ? null : () => _toggleTts(question),
+          ),
           // 多語系解析切換下拉選單
           PopupMenuButton<String>(
             icon: const Icon(Icons.translate),

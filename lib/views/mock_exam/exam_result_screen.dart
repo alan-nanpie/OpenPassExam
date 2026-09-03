@@ -69,6 +69,37 @@ class ExamResultScreen extends StatelessWidget {
                     color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                   ),
                 ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: session.isNtpVerified
+                        ? AppColors.primary.withValues(alpha: 0.1)
+                        : Colors.orange.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        session.isNtpVerified ? Icons.verified : Icons.warning_amber,
+                        size: 14,
+                        color: session.isNtpVerified ? AppColors.primary : Colors.orange,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        session.isNtpVerified
+                            ? 'NTP 網路防竄改時間認證通過'
+                            : '未經 NTP 伺服器時間校驗',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: session.isNtpVerified ? AppColors.primary : Colors.orange,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
