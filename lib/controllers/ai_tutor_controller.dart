@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart';
 import '../data/models/question.dart';
 import '../data/repositories/rag_repository.dart';
 import '../services/ai_service.dart';
@@ -9,6 +10,9 @@ class ChatMessage {
   final bool isUser;
   final DateTime timestamp;
   final String? modelBadge;
+  final Question? questionContext;
+  final String? personaStyle;
+  final String? failureReason;
 
   ChatMessage({
     required this.id,
@@ -16,6 +20,9 @@ class ChatMessage {
     required this.isUser,
     required this.timestamp,
     this.modelBadge,
+    this.questionContext,
+    this.personaStyle,
+    this.failureReason,
   });
 }
 
@@ -105,6 +112,20 @@ class AiTutorController extends ChangeNotifier {
       final isOffline = await aiService.isOffline();
       final isCloudUsed = !isOffline && (apiKey != null && apiKey.isNotEmpty) && isForceCloud;
 
+      // 提取是否包含雲端異常診斷或原因
+      String? failureReason;
+      if (responseText.contains('雲端 API 連線異常提示') || responseText.contains('雲端模式需要 Gemini API Key')) {
+        if (responseText.contains('診斷原因')) {
+          final start = responseText.indexOf('診斷原因**：');
+          final end = responseText.indexOf('\n', start);
+          if (start >= 0 && end > start) {
+            failureReason = responseText.substring(start + 7, end).trim();
+          }
+        } else if (!hasUserApiKey) {
+          failureReason = '未配置 Google Gemini API Key (BYOK)';
+        }
+      }
+
       _messages.add(
         ChatMessage(
           id: 'msg_${DateTime.now().millisecondsSinceEpoch}_ai',
@@ -113,7 +134,10 @@ class AiTutorController extends ChangeNotifier {
           timestamp: DateTime.now(),
           modelBadge: isCloudUsed
               ? effectiveConfig.primaryModel
-              : 'Gemma 4 (2B) 離線',
+              : (failureReason != null ? 'Gemma 4 (2B) 接管' : 'Gemma 4 (2B) 離線'),
+          questionContext: questionContext,
+          personaStyle: _currentPersona.name,
+          failureReason: failureReason,
         ),
       );
     } catch (e) {
@@ -123,6 +147,7 @@ class AiTutorController extends ChangeNotifier {
           text: '❌ AI 推理發生錯誤，請稍後重試或切換至端側模式：$e',
           isUser: false,
           timestamp: DateTime.now(),
+          failureReason: e.toString(),
         ),
       );
     } finally {
@@ -134,6 +159,92 @@ class AiTutorController extends ChangeNotifier {
   Future<void> explainQuestion(Question question) async {
     final prompt = '請以深入淺出的方式，為我解析這道考題：「${question.title}」的解題思路與考點核心。';
     await sendUserMessage(prompt, questionContext: question);
+  }
+
+  /// 匯出特定單一問答對話為 Markdown 字串
+  String generateSingleExchangeMarkdown(ChatMessage aiMsg, {ChatMessage? userMsg}) {
+    final sb = StringBuffer();
+    final timeStr = DateFormat('yyyy-MM-dd HH:mm:ss').format(aiMsg.timestamp);
+
+    sb.writeln('# 🤖 OpenPassExam AI 助教專業對話紀錄');
+    sb.writeln('> 📅 **紀錄時間**：$timeStr\n');
+
+    if (userMsg != null) {
+      sb.writeln('## 👤 學員提問');
+      sb.writeln(userMsg.text);
+      sb.writeln();
+    }
+
+    if (aiMsg.questionContext != null) {
+      sb.writeln('### 📝 關聯考試考題');
+      sb.writeln('**題目**：${aiMsg.questionContext!.title}');
+      sb.writeln('**領域**：${aiMsg.questionContext!.topic}');
+      sb.writeln();
+    }
+
+    sb.writeln('## 🧠 AI 專家回答與推論規格');
+    sb.writeln('- ⚡ **使用模型**：${aiMsg.modelBadge ?? "自動調度"}');
+    sb.writeln('- 🎓 **專家角色規格**：${aiMsg.personaStyle ?? _currentPersona.name}');
+
+    if (aiMsg.failureReason != null && aiMsg.failureReason!.isNotEmpty) {
+      sb.writeln('- ⚠️ **雲端無法使用具體原因**：${aiMsg.failureReason}');
+    } else {
+      sb.writeln('- ✅ **推論狀態**：推論正常完成');
+    }
+    sb.writeln();
+
+    sb.writeln('### 💬 回答內容');
+    sb.writeln(aiMsg.text);
+    sb.writeln();
+    sb.writeln('---\n*由 OpenPassExam AI 智慧學習系統自動匯出*');
+
+    return sb.toString();
+  }
+
+  /// 匯出全部問答對話為 Markdown 字串
+  String generateAllExchangesMarkdown() {
+    final sb = StringBuffer();
+    final exportTime = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
+
+    sb.writeln('# 📚 OpenPassExam AI 助教完整對話紀錄匯總');
+    sb.writeln('> 📅 **匯出時間**：$exportTime');
+    sb.writeln('> 💬 **對話總則數**：${_messages.length} 則訊息\n');
+    sb.writeln('---\n');
+
+    ChatMessage? pendingUserMsg;
+    int exchangeIndex = 1;
+
+    for (final msg in _messages) {
+      if (msg.isUser) {
+        pendingUserMsg = msg;
+      } else {
+        sb.writeln('## 📌 對話 #$exchangeIndex (${DateFormat("HH:mm:ss").format(msg.timestamp)})\n');
+        if (pendingUserMsg != null) {
+          sb.writeln('### 👤 學員提問');
+          sb.writeln(pendingUserMsg.text);
+          sb.writeln();
+          pendingUserMsg = null;
+        }
+
+        if (msg.questionContext != null) {
+          sb.writeln('**關聯題目**：${msg.questionContext!.title} (${msg.questionContext!.topic})');
+          sb.writeln();
+        }
+
+        sb.writeln('### 🧠 AI 回答');
+        sb.writeln('- ⚡ **推論模型**：${msg.modelBadge ?? "自動調度"}');
+        if (msg.failureReason != null && msg.failureReason!.isNotEmpty) {
+          sb.writeln('- ⚠️ **雲端異常/未啟用原因明細**：${msg.failureReason}');
+        }
+        sb.writeln();
+        sb.writeln(msg.text);
+        sb.writeln('\n---\n');
+        exchangeIndex++;
+      }
+    }
+
+    sb.writeln('*由 OpenPassExam AI 助教匯出系統自動產出*');
+    return sb.toString();
   }
 }
 

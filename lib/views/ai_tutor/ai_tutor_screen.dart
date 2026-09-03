@@ -5,6 +5,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../controllers/ai_tutor_controller.dart';
 import '../../services/offline_model_manager.dart';
+import '../../core/utils/file_exporter.dart';
 import 'persona_selector_widget.dart';
 
 class AiTutorScreen extends StatefulWidget {
@@ -77,6 +78,11 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
             ),
             tooltip: aiCtrl.hasUserApiKey ? '個人 Gemini Key：已設定' : '設定個人 Gemini API Key (BYOK)',
             onPressed: () => _showApiKeyDialog(context, aiCtrl),
+          ),
+          IconButton(
+            icon: const Icon(Icons.file_download_outlined),
+            tooltip: '匯出全部對話為 Markdown (西元年月日時分秒.md)',
+            onPressed: () => _exportAllMessagesToMarkdown(context, aiCtrl),
           ),
           IconButton(
             icon: const Icon(Icons.info_outline),
@@ -196,7 +202,23 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
               itemCount: aiCtrl.messages.length,
               itemBuilder: (ctx, idx) {
                 final msg = aiCtrl.messages[idx];
-                return _buildMessageBubble(context, msg, isDark);
+                ChatMessage? correspondingUserMsg;
+                if (!msg.isUser) {
+                  // 往前尋找距離此 AI 回答最近的使用者提問
+                  for (int i = idx - 1; i >= 0; i--) {
+                    if (aiCtrl.messages[i].isUser) {
+                      correspondingUserMsg = aiCtrl.messages[i];
+                      break;
+                    }
+                  }
+                }
+                return _buildMessageBubble(
+                  context,
+                  msg,
+                  isDark,
+                  correspondingUserMsg: correspondingUserMsg,
+                  aiCtrl: aiCtrl,
+                );
               },
             ),
           ),
@@ -278,7 +300,7 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
     );
   }
 
-  Widget _buildMessageBubble(BuildContext context, ChatMessage msg, bool isDark) {
+  Widget _buildMessageBubble(BuildContext context, ChatMessage msg, bool isDark, {ChatMessage? correspondingUserMsg, required AiTutorController aiCtrl}) {
     if (msg.isUser) {
       return Align(
         alignment: Alignment.centerRight,
@@ -312,23 +334,56 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (msg.modelBadge != null)
-              Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (msg.modelBadge != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      '⚡ ${msg.modelBadge}',
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                      ),
+                    ),
+                  )
+                else
+                  const SizedBox.shrink(),
+                // 單一問題匯出 Markdown 按鈕
+                InkWell(
                   borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  '⚡ ${msg.modelBadge}',
-                  style: const TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 11,
+                  onTap: () => _exportSingleMessageToMarkdown(context, aiCtrl, msg, userMsg: correspondingUserMsg),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.download_rounded,
+                          size: 14,
+                          color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '匯出此題 Markdown',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
+              ],
+            ),
+            const SizedBox(height: 8),
             MarkdownBody(
               data: msg.text,
               selectable: true,
@@ -353,6 +408,77 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
         ),
       ),
     );
+  }
+
+  /// 匯出單一對話為 Markdown (西元年月日時分秒.md)
+  Future<void> _exportSingleMessageToMarkdown(
+    BuildContext context,
+    AiTutorController aiCtrl,
+    ChatMessage aiMsg, {
+    ChatMessage? userMsg,
+  }) async {
+    final fileName = FileExporter.generateTimestampFileName(aiMsg.timestamp);
+    final mdContent = aiCtrl.generateSingleExchangeMarkdown(aiMsg, userMsg: userMsg);
+
+    final success = await FileExporter.exportMarkdown(
+      markdownContent: mdContent,
+      customFileName: fileName,
+    );
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success ? '✅ 已成功匯出問答紀錄：$fileName' : '❌ 匯出失敗，請確認瀏覽器下載權限',
+          ),
+          backgroundColor: success ? AppColors.correctGreen : Colors.red,
+          duration: const Duration(seconds: 4),
+          action: SnackBarAction(
+            label: '確定',
+            textColor: Colors.white,
+            onPressed: () {},
+          ),
+        ),
+      );
+    }
+  }
+
+  /// 匯出全部歷史對話為 Markdown (西元年月日時分秒.md)
+  Future<void> _exportAllMessagesToMarkdown(
+    BuildContext context,
+    AiTutorController aiCtrl,
+  ) async {
+    if (aiCtrl.messages.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('目前尚無對話紀錄可供匯出')),
+      );
+      return;
+    }
+
+    final fileName = FileExporter.generateTimestampFileName();
+    final mdContent = aiCtrl.generateAllExchangesMarkdown();
+
+    final success = await FileExporter.exportMarkdown(
+      markdownContent: mdContent,
+      customFileName: fileName,
+    );
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success ? '🎉 已匯出全部 ${aiCtrl.messages.length} 則完整對話：$fileName' : '❌ 匯出失敗，請重試',
+          ),
+          backgroundColor: success ? AppColors.correctGreen : Colors.red,
+          duration: const Duration(seconds: 4),
+          action: SnackBarAction(
+            label: '確定',
+            textColor: Colors.white,
+            onPressed: () {},
+          ),
+        ),
+      );
+    }
   }
 
   void _showAiInfoDialog(BuildContext context) {
