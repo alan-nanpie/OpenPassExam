@@ -10,6 +10,13 @@ abstract class IUserRepository {
   Future<void> switchRole(UserRole newRole);
   Future<void> updateSubscription(DateTime expiryDate);
   Future<String> getOrGenerateDeviceId();
+  Future<AppUser> signInWithGoogleAccount({
+    required String email,
+    required String displayName,
+    String? photoUrl,
+    UserRole? role,
+  });
+  Future<void> clearUser();
 }
 
 class UserRepository implements IUserRepository {
@@ -47,15 +54,55 @@ class UserRepository implements IUserRepository {
     final defaultUser = AppUser(
       uid: 'usr_guest_8888',
       email: 'guest@passexam.app',
-      displayName: 'PassExam 體驗學員',
-      role: UserRole.admin, // 預設提供完整體驗權限
+      displayName: '訪客學員 (未登入)',
+      role: UserRole.guest,
       activeDeviceId: deviceId,
       createdAt: DateTime.now(),
-      subscriptionExpiry: DateTime.now().add(const Duration(days: 365)),
+      subscriptionExpiry: null,
+      authProvider: 'guest',
     );
 
     await saveUser(defaultUser);
     return defaultUser;
+  }
+
+  @override
+  Future<AppUser> signInWithGoogleAccount({
+    required String email,
+    required String displayName,
+    String? photoUrl,
+    UserRole? role,
+  }) async {
+    final deviceId = await getOrGenerateDeviceId();
+    // 依據 Google 帳號產生唯一的 UID
+    final cleanEmail = email.trim().toLowerCase();
+    final sanitizedPrefix = cleanEmail.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
+    final googleUid = 'google_$sanitizedPrefix';
+
+    // 判斷角色：若原先指定 admin，或預設賦予具有 UGC 出題權限的 creator
+    final effectiveRole = role ??
+        (cleanEmail.contains('admin') ? UserRole.admin : UserRole.creator);
+
+    final googleUser = AppUser(
+      uid: googleUid,
+      email: cleanEmail,
+      displayName: displayName.trim().isNotEmpty ? displayName.trim() : cleanEmail.split('@').first,
+      role: effectiveRole,
+      activeDeviceId: deviceId,
+      createdAt: DateTime.now(),
+      subscriptionExpiry: DateTime.now().add(const Duration(days: 365)),
+      photoUrl: photoUrl,
+      authProvider: 'google',
+    );
+
+    await saveUser(googleUser);
+    return googleUser;
+  }
+
+  @override
+  Future<void> clearUser() async {
+    _cachedUser = null;
+    await _prefs.remove(AppConstants.prefKeyUserData);
   }
 
   @override

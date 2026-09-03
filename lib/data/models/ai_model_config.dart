@@ -12,15 +12,17 @@ class AiModelConfig {
   final double temperature;
   final int maxTokens;
   final int thinkingBudget;
+  final bool preferOffline;
   final AiConfigLayer sourceLayer;
 
   AiModelConfig({
-    this.primaryModel = 'gemini-3.7-flash',
+    this.primaryModel = 'gemini-3.8-flash',
     this.fallbackModel = 'gemini-2.5-flash',
     this.onDeviceModel = 'gemma-4-2b',
     this.temperature = 1.0,
     this.maxTokens = 4096,
     this.thinkingBudget = 2048,
+    this.preferOffline = true,
     this.sourceLayer = AiConfigLayer.builtInDefault,
   });
 
@@ -32,18 +34,20 @@ class AiModelConfig {
       'temperature': temperature,
       'max_tokens': maxTokens,
       'thinking_budget': thinkingBudget,
+      'prefer_offline': preferOffline,
       'source_layer': sourceLayer.name,
     };
   }
 
   factory AiModelConfig.fromMap(Map<String, dynamic> map, {AiConfigLayer layer = AiConfigLayer.builtInDefault}) {
     return AiModelConfig(
-      primaryModel: (map['primary_model'] ?? map['primaryModel'] ?? 'gemini-3.7-flash').toString(),
+      primaryModel: (map['primary_model'] ?? map['primaryModel'] ?? 'gemini-3.8-flash').toString(),
       fallbackModel: (map['fallback_model'] ?? map['fallbackModel'] ?? 'gemini-2.5-flash').toString(),
       onDeviceModel: (map['on_device_model'] ?? map['onDeviceModel'] ?? 'gemma-4-2b').toString(),
       temperature: (map['temperature'] as num?)?.toDouble() ?? 1.0,
       maxTokens: (map['max_tokens'] ?? map['maxTokens'] as num?)?.toInt() ?? 4096,
       thinkingBudget: (map['thinking_budget'] ?? map['thinkingBudget'] as num?)?.toInt() ?? 2048,
+      preferOffline: (map['prefer_offline'] ?? map['preferOffline']) as bool? ?? true,
       sourceLayer: layer,
     );
   }
@@ -55,6 +59,7 @@ class AiModelConfig {
     double? temperature,
     int? maxTokens,
     int? thinkingBudget,
+    bool? preferOffline,
     AiConfigLayer? sourceLayer,
   }) {
     return AiModelConfig(
@@ -64,6 +69,7 @@ class AiModelConfig {
       temperature: temperature ?? this.temperature,
       maxTokens: maxTokens ?? this.maxTokens,
       thinkingBudget: thinkingBudget ?? this.thinkingBudget,
+      preferOffline: preferOffline ?? this.preferOffline,
       sourceLayer: sourceLayer ?? this.sourceLayer,
     );
   }

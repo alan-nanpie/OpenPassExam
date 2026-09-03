@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/constants/exam_subjects_data.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../core/widgets/enhanced_security_watermark.dart';
 import '../../controllers/auth_controller.dart';
@@ -18,7 +17,9 @@ import '../admin/admin_dashboard_screen.dart';
 import '../profile/profile_screen.dart';
 import '../settings/settings_screen.dart';
 import '../audiobook/audiobook_player_screen.dart';
+import '../auth/login_screen.dart';
 import 'subject_detail_screen.dart';
+import 'create_subject_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -29,6 +30,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedNavIndex = 0;
+  int _subjectFilterIndex = 0; // 0: 全部, 1: 官方精選, 2: 學員社群自建
 
   @override
   Widget build(BuildContext context) {
@@ -142,6 +144,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildHomeDashboard(BuildContext context) {
     final examCtrl = context.watch<ExamController>();
     final auth = context.watch<AuthController>();
+    final user = auth.currentUser;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return ListView(
@@ -193,30 +196,117 @@ class _HomeScreenState extends State<HomeScreen> {
         _buildQuickActionGrid(context),
         const SizedBox(height: 24),
 
-        // 熱門推薦考科
+        // 考試科目與社群自建專區
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              context.tr('popular_subjects'),
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  context.tr('popular_subjects'),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  '共 ${examCtrl.allSubjects.length} 科目 (${examCtrl.officialSubjects.length} 官方 / ${examCtrl.customSubjects.length} 社群自建)',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                  ),
+                ),
+              ],
             ),
-            Text(
-              '18+ Cisco 專業科目',
-              style: TextStyle(
-                fontSize: 12,
-                color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+            ElevatedButton.icon(
+              icon: const Icon(Icons.add, size: 16),
+              label: const Text('自建考科', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
+              onPressed: () {
+                if (user == null || user.isGuest) {
+                  _showLoginRequiredDialog(context);
+                } else {
+                  CreateSubjectDialog.show(
+                    context,
+                    examController: examCtrl,
+                    authController: auth,
+                  );
+                }
+              },
             ),
           ],
+        ),
+        const SizedBox(height: 10),
+
+        // 分類過濾 Segmented Filter
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              FilterChip(
+                label: Text('全部科目 (${examCtrl.allSubjects.length})'),
+                selected: _subjectFilterIndex == 0,
+                onSelected: (val) {
+                  if (val) setState(() => _subjectFilterIndex = 0);
+                },
+              ),
+              const SizedBox(width: 8),
+              FilterChip(
+                avatar: const Icon(Icons.verified, size: 14, color: AppColors.primary),
+                label: Text('官方認證 (${examCtrl.officialSubjects.length})'),
+                selected: _subjectFilterIndex == 1,
+                onSelected: (val) {
+                  if (val) setState(() => _subjectFilterIndex = 1);
+                },
+              ),
+              const SizedBox(width: 8),
+              FilterChip(
+                avatar: const Icon(Icons.groups, size: 14, color: Colors.teal),
+                label: Text('學員自建 (${examCtrl.customSubjects.length})'),
+                selected: _subjectFilterIndex == 2,
+                onSelected: (val) {
+                  if (val) setState(() => _subjectFilterIndex = 2);
+                },
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 12),
 
         // 科目卡片列表
-        ...ExamSubjectsData.allSubjects.map((subject) {
-          final isSelected = examCtrl.currentSubjectId == subject.id;
-          return _buildSubjectCard(context, subject, isSelected);
-        }),
+        if (_getFilteredSubjects(examCtrl).isEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 32),
+            child: Center(
+              child: Column(
+                children: [
+                  const Icon(Icons.school_outlined, size: 48, color: Colors.grey),
+                  const SizedBox(height: 10),
+                  const Text('目前尚無社群學員自建科目', style: TextStyle(color: Colors.grey)),
+                  const SizedBox(height: 8),
+                  TextButton.icon(
+                    icon: const Icon(Icons.add),
+                    label: const Text('成為第一個建立考科的創作者！'),
+                    onPressed: () {
+                      if (user == null || user.isGuest) {
+                        _showLoginRequiredDialog(context);
+                      } else {
+                        CreateSubjectDialog.show(context, examController: examCtrl, authController: auth);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          ..._getFilteredSubjects(examCtrl).map((subject) {
+            final isSelected = examCtrl.currentSubjectId == subject.id;
+            return _buildSubjectCard(context, subject, isSelected);
+          }),
       ],
     );
   }
@@ -432,7 +522,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
-                  Icons.router,
+                  _getSubjectIcon(subject.iconName),
                   color: isSelected ? Colors.white : AppColors.primary,
                   size: 24,
                 ),
@@ -476,6 +566,24 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                           ),
+                        if (!subject.isOfficial) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.teal.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              '🌐 ${subject.creatorName ?? "學員自建"}',
+                              style: const TextStyle(
+                                color: Colors.teal,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -501,6 +609,71 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  List<ExamSubject> _getFilteredSubjects(ExamController examCtrl) {
+    if (_subjectFilterIndex == 1) {
+      return examCtrl.officialSubjects;
+    } else if (_subjectFilterIndex == 2) {
+      return examCtrl.customSubjects;
+    }
+    return examCtrl.allSubjects;
+  }
+
+  IconData _getSubjectIcon(String iconName) {
+    switch (iconName) {
+      case 'cloud':
+        return Icons.cloud;
+      case 'security':
+        return Icons.security;
+      case 'code':
+        return Icons.code;
+      case 'school':
+        return Icons.school;
+      case 'language':
+        return Icons.language;
+      case 'business':
+        return Icons.business_center;
+      case 'router':
+      default:
+        return Icons.router;
+    }
+  }
+
+  void _showLoginRequiredDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.lock_outline, color: AppColors.primary),
+            SizedBox(width: 8),
+            Text('需以 Google 帳號登入'),
+          ],
+        ),
+        content: const Text('自訂建立考試科目與出題為 Google 帳號創作者專屬功能。請登入您的 Google 帳號以解鎖出題、社群討論與完整題庫權限！'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('稍後再說'),
+          ),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.login),
+            label: const Text('前往 Google 登入'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+              );
+            },
+          ),
+        ],
       ),
     );
   }

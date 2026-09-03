@@ -64,12 +64,18 @@ class AdminController extends ChangeNotifier {
   Future<void> saveQuestion({
     required String subjectId,
     required Question question,
+    String? currentUserId,
+    bool isAdmin = true,
   }) async {
     _isLoading = true;
     notifyListeners();
 
     final repo = repositoryFactory.getQuestionRepository(subjectId);
-    await repo.saveQuestion(question);
+    await repo.saveQuestion(
+      question,
+      currentUserId: currentUserId,
+      isAdmin: isAdmin,
+    );
 
     await loadPendingQuestions(subjectId);
     _statusMessage = '✅ 考題已成功儲存！';
@@ -80,12 +86,18 @@ class AdminController extends ChangeNotifier {
   Future<void> deleteQuestion({
     required String subjectId,
     required String questionId,
+    String? currentUserId,
+    bool isAdmin = true,
   }) async {
     _isLoading = true;
     notifyListeners();
 
     final repo = repositoryFactory.getQuestionRepository(subjectId);
-    await repo.deleteQuestion(questionId);
+    await repo.deleteQuestion(
+      questionId,
+      currentUserId: currentUserId,
+      isAdmin: isAdmin,
+    );
 
     await loadPendingQuestions(subjectId);
     _statusMessage = '🗑️ 考題已成功刪除！';

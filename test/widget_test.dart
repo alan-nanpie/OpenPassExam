@@ -5,8 +5,11 @@ import 'package:passexam/data/datasources/rtdb_approved_keys_datasource.dart';
 import 'package:passexam/data/repositories/repository_factory.dart';
 import 'package:passexam/data/repositories/user_repository.dart';
 import 'package:passexam/data/repositories/rag_repository.dart';
+import 'package:passexam/data/repositories/discussion_repository.dart';
+import 'package:passexam/data/repositories/subject_repository.dart';
 import 'package:passexam/services/remote_config_service.dart';
 import 'package:passexam/services/ai_service.dart';
+import 'package:passexam/services/offline_model_manager.dart';
 import 'package:passexam/services/play_billing_service.dart';
 import 'package:passexam/main.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -22,12 +25,16 @@ void main() {
     final repoFactory = RepositoryFactory(localCache: localCache, rtdbDatasource: rtdb);
     final userRepo = UserRepository(prefs);
     final ragRepo = RagRepository();
+    final discussionRepo = DiscussionRepository(localCache: localCache);
+    final subjectRepo = SubjectRepository(localCache: localCache);
+    final offlineModelManager = OfflineModelManager(prefs);
     final remoteConfig = RemoteConfigService();
     final aiService = AiService(
       localCache: localCache,
       rtdbDatasource: rtdb,
       remoteConfigService: remoteConfig,
       connectivity: Connectivity(),
+      offlineModelManager: offlineModelManager,
     );
     final playBilling = PlayBillingService(userRepository: userRepo);
 
@@ -39,8 +46,11 @@ void main() {
         repoFactory: repoFactory,
         userRepo: userRepo,
         ragRepo: ragRepo,
+        discussionRepo: discussionRepo,
+        subjectRepo: subjectRepo,
         remoteConfigService: remoteConfig,
         aiService: aiService,
+        offlineModelManager: offlineModelManager,
         playBillingService: playBilling,
       ),
     );

@@ -7,6 +7,7 @@ import '../data/models/ai_model_config.dart';
 import '../data/models/question.dart';
 import '../data/models/rag_knowledge_chunk.dart';
 import 'remote_config_service.dart';
+import 'offline_model_manager.dart';
 
 enum AiPersona {
   friendlyTutor, // 生活化通俗比喻助教
@@ -19,12 +20,14 @@ class AiService {
   final RtdbApprovedKeysDatasource rtdbDatasource;
   final RemoteConfigService remoteConfigService;
   final Connectivity connectivity;
+  final OfflineModelManager? offlineModelManager;
 
   AiService({
     required this.localCache,
     required this.rtdbDatasource,
     required this.remoteConfigService,
     required this.connectivity,
+    this.offlineModelManager,
   });
 
   /// 四層階層式 AI 調度解析
@@ -45,7 +48,7 @@ class AiService {
     return remoteConfigService.currentConfig;
   }
 
-  /// 檢查是否斷網（若斷網則自動降級至端側 Gemma 4 2B）
+  /// 檢查是否斷網（若斷網則強制離線端側模型）
   Future<bool> isOffline() async {
     try {
       final results = await connectivity.checkConnectivity();
@@ -56,7 +59,7 @@ class AiService {
     return false;
   }
 
-  /// 過濾 Gemini 3.7 Flash Dynamic Thinking 的思考標記
+  /// 過濾 Gemini 3.8 / 3.7 Flash Dynamic Thinking 的思考標記
   String filterThinkingOutput(String rawText) {
     // 移除 <thought>...</thought> 標籤及其中內容
     final thoughtRegex = RegExp(r'<thought>[\s\S]*?<\/thought>', multiLine: true);
@@ -72,19 +75,32 @@ class AiService {
     return filtered;
   }
 
-  /// 核心推理接口：支援考題深度剖析、生活化比喻、Cisco CLI 手把手教學與雙軌 Persona
+  /// 核心推理接口：實施【三層階層調度策略】
+  /// 1. 第一優先：端側離線 AI 模型 (Gemma 4 2B / Chrome Built-in Nano)
+  /// 2. 第二優先：雲端 Google 最新多模態模型 (Gemini 3.8 Flash)
+  /// 3. 第三優先：主流最穩定備用多模態模型 (Gemini 2.5 Flash / Gemini 1.5 Pro)
   Future<String> askAiTutor({
     required String prompt,
     Question? questionContext,
     List<RagKnowledgeChunk>? ragChunks,
     AiPersona persona = AiPersona.friendlyTutor,
     String? apiKey,
+    bool forceCloud = false,
   }) async {
     final offline = await isOffline();
     final config = resolveEffectiveAiConfig();
+    final offlineReady = offlineModelManager?.isModelReady ?? true;
 
-    if (offline) {
-      // 調度端側 Gemma 4 (2B) 4096 tokens 本地推論
+    // === 【第 1 優先】：端側離線 AI 模型 ===
+    // 若斷網，或使用者設定開啟「離線第一優先 (preferOffline)」且未強制雲端
+    if (offline || (!forceCloud && config.preferOffline && offlineReady)) {
+      if (offlineModelManager != null && offlineModelManager!.isModelReady) {
+        return await offlineModelManager!.runLocalInference(
+          prompt: prompt,
+          questionTitle: questionContext?.title,
+          personaStyle: persona.name,
+        );
+      }
       return _generateOnDeviceGemmaResponse(
         prompt: prompt,
         question: questionContext,
@@ -92,10 +108,11 @@ class AiService {
       );
     }
 
-    // 雲端 Gemini 3.7 Flash
-    if (apiKey != null && apiKey.isNotEmpty) {
+    // === 【第 2 優先】：雲端 Google 最新 AI 多模態模型 (Gemini 3.8 Flash) ===
+    if (apiKey != null && apiKey.isNotEmpty && !offline) {
       try {
-        final cloudResponse = await _callGemini37FlashApi(
+        final cloudResponse = await _callGeminiMultimodalApi(
+          modelName: config.primaryModel, // 預設 gemini-3.8-flash
           prompt: prompt,
           apiKey: apiKey,
           config: config,
@@ -104,12 +121,27 @@ class AiService {
           persona: persona,
         );
         return filterThinkingOutput(cloudResponse);
-      } catch (_) {
-        // API 呼叫失敗時平滑降級為內部智慧推理引擎
+      } catch (e) {
+        // === 【第 3 優先 (備用)】：主流且最穩定多模態模型 (Gemini 2.5 Flash) ===
+        try {
+          final fallbackResponse = await _callGeminiMultimodalApi(
+            modelName: config.fallbackModel, // 預設 gemini-2.5-flash
+            prompt: prompt,
+            apiKey: apiKey,
+            config: config,
+            question: questionContext,
+            ragChunks: ragChunks,
+            persona: persona,
+          );
+          final cleanFallback = filterThinkingOutput(fallbackResponse);
+          return '🛡️ **[已切換至備用穩定模型：${config.fallbackModel}]**\n\n$cleanFallback';
+        } catch (_) {
+          // 雙雲端模型均失敗時，平滑降級至本地端側智慧引擎
+        }
       }
     }
 
-    // 本地智慧引擎模擬 (保證離線與無 Key 時 100% 正常運作且產出長篇 4096 tokens 等級深度解析)
+    // 本地智慧引擎兜底 (保證無 Key 或完全異常時 100% 正常回覆)
     return _generateSimulatedHighQualityResponse(
       prompt: prompt,
       question: questionContext,
@@ -119,7 +151,8 @@ class AiService {
     );
   }
 
-  Future<String> _callGemini37FlashApi({
+  Future<String> _callGeminiMultimodalApi({
+    required String modelName,
     required String prompt,
     required String apiKey,
     required AiModelConfig config,
@@ -128,7 +161,7 @@ class AiService {
     required AiPersona persona,
   }) async {
     final url = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/models/${config.primaryModel}:generateContent?key=$apiKey',
+      'https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey',
     );
 
     final systemInstruction = _buildSystemInstruction(persona, ragChunks);
@@ -137,6 +170,9 @@ class AiService {
       userContent.writeln('【考題資訊】: ${question.title}');
       userContent.writeln('【考題選項】: ${question.options.join(" | ")}');
       userContent.writeln('【官方詳解】: ${question.explanation}');
+      if (question.imageUrl != null && question.imageUrl!.isNotEmpty) {
+        userContent.writeln('【考題拓撲圖片連結】: ${question.imageUrl}');
+      }
     }
     userContent.writeln('【學員提問】: $prompt');
 
@@ -175,7 +211,7 @@ class AiService {
         }
       }
     }
-    throw Exception('Gemini API Error: ${response.statusCode}');
+    throw Exception('Gemini API Error ($modelName): ${response.statusCode}');
   }
 
   String _buildSystemInstruction(AiPersona persona, List<RagKnowledgeChunk>? ragChunks) {

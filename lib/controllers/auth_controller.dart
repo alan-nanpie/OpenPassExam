@@ -57,24 +57,34 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> loginWithGoogle() async {
+  Future<void> loginWithGoogle({
+    String? email,
+    String? displayName,
+    String? photoUrl,
+    UserRole? role,
+  }) async {
     _isLoading = true;
     notifyListeners();
-    final deviceId = await userRepository.getOrGenerateDeviceId();
-    final user = AppUser(
-      uid: 'usr_google_6688',
-      email: 'alex.engineer@gmail.com',
-      displayName: 'Alex Chen (Cisco Pro)',
-      role: UserRole.admin,
-      activeDeviceId: deviceId,
-      createdAt: DateTime.now(),
-      subscriptionExpiry: DateTime.now().add(const Duration(days: 365)),
-    );
-    await userRepository.saveUser(user);
-    _currentUser = user;
-    _hasDeviceConflict = false;
-    _isLoading = false;
-    notifyListeners();
+    try {
+      final selectedEmail = (email != null && email.trim().isNotEmpty)
+          ? email.trim()
+          : 'google.learner@gmail.com';
+      final selectedName = (displayName != null && displayName.trim().isNotEmpty)
+          ? displayName.trim()
+          : selectedEmail.split('@').first;
+
+      final user = await userRepository.signInWithGoogleAccount(
+        email: selectedEmail,
+        displayName: selectedName,
+        photoUrl: photoUrl,
+        role: role,
+      );
+      _currentUser = user;
+      _hasDeviceConflict = false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   Future<void> switchRole(UserRole role) async {
@@ -85,8 +95,12 @@ class AuthController extends ChangeNotifier {
   }
 
   Future<void> logout() async {
-    _currentUser = null;
+    _isLoading = true;
+    notifyListeners();
+    await userRepository.clearUser();
+    _currentUser = await userRepository.getCurrentUser();
     _hasDeviceConflict = false;
+    _isLoading = false;
     notifyListeners();
   }
 }

@@ -7,7 +7,7 @@
 # 3. 【一鍵發布】：自動啟用 APIs、建立映像庫、雲端構建與部署。
 # ==============================================================================
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 
 function Write-Header {
     Write-Host "`n========================================================" -ForegroundColor Cyan
@@ -42,7 +42,13 @@ if (-not (Get-Command "gcloud" -ErrorAction SilentlyContinue)) {
 }
 
 # 1. 載入或引導建立私有機密設定檔 (scripts/deploy.env)
-$SCRIPT_DIR = Split-Path -Parent $MyInvocation.MyCommand.Path
+$SCRIPT_DIR = $PSScriptRoot
+if (-not $SCRIPT_DIR) {
+    $SCRIPT_DIR = Split-Path -Parent $MyInvocation.MyCommand.Path
+}
+if (-not $SCRIPT_DIR) {
+    $SCRIPT_DIR = Join-Path (Get-Location) "scripts"
+}
 $ENV_FILE = Join-Path $SCRIPT_DIR "deploy.env"
 $ENV_EXAMPLE_FILE = Join-Path $SCRIPT_DIR "deploy.env.example"
 
@@ -132,8 +138,8 @@ Write-Success "Google Cloud APIs 已就緒。"
 
 # 3. 檢查或建立 Artifact Registry
 Write-Step "3/5" "檢查 Artifact Registry 容器存放區 [$REPO_NAME]..."
-$repoExists = gcloud artifacts repositories describe $REPO_NAME --location=$REGION --project=$PROJECT_ID 2>$null
-if (-not $repoExists) {
+$existingRepos = (gcloud artifacts repositories list --location=$REGION --project=$PROJECT_ID --format="value(name)" 2>$null)
+if (-not ($existingRepos -match $REPO_NAME)) {
     Write-Host "建立 Artifact Registry 存放區: $REPO_NAME ($REGION)..." -ForegroundColor Yellow
     gcloud artifacts repositories create $REPO_NAME `
         --repository-format=docker `
@@ -150,6 +156,10 @@ $IMAGE_URI = "$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/${SERVICE_NAME}:$IMA
 Write-Step "4/5" "透過 Google Cloud Build 在雲端建置 Flutter Web 容器映像檔..."
 Write-Host "目標映像檔 URI: $IMAGE_URI" -ForegroundColor Gray
 gcloud builds submit --tag $IMAGE_URI --project=$PROJECT_ID
+if ($LASTEXITCODE -ne 0) {
+    Write-Err "Cloud Build 建置失敗！請檢查日誌。"
+    exit $LASTEXITCODE
+}
 Write-Success "容器映像檔建置並推送完成！"
 
 # 5. 部署服務至 Google Cloud Run
@@ -163,6 +173,10 @@ gcloud run deploy $SERVICE_NAME `
     --memory $MEMORY_LIMIT `
     --cpu $CPU_LIMIT `
     --project=$PROJECT_ID
+if ($LASTEXITCODE -ne 0) {
+    Write-Err "Cloud Run 部署失敗！"
+    exit $LASTEXITCODE
+}
 
 # 6. 取得並輸出線上正式網址
 $SERVICE_URL = (gcloud run services describe $SERVICE_NAME --platform managed --region $REGION --project=$PROJECT_ID --format="value(status.url)" 2>$null).Trim()
@@ -173,3 +187,4 @@ Write-Host "🌐 正式服務網址 (URL):" -ForegroundColor Cyan
 Write-Host "   $SERVICE_URL" -ForegroundColor Yellow
 Write-Host "========================================================`n" -ForegroundColor Green
 Write-Host "💡 提示：此網址任何人透過手機或電腦瀏覽器皆可直接開啟使用！" -ForegroundColor Gray
+

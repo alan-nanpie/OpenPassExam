@@ -16,9 +16,12 @@ import 'data/datasources/rtdb_approved_keys_datasource.dart';
 import 'data/repositories/repository_factory.dart';
 import 'data/repositories/user_repository.dart';
 import 'data/repositories/rag_repository.dart';
+import 'data/repositories/discussion_repository.dart';
+import 'data/repositories/subject_repository.dart';
 
 import 'services/remote_config_service.dart';
 import 'services/ai_service.dart';
+import 'services/offline_model_manager.dart';
 import 'services/play_billing_service.dart';
 
 import 'controllers/auth_controller.dart';
@@ -32,6 +35,7 @@ import 'controllers/notes_controller.dart';
 import 'controllers/billing_controller.dart';
 import 'controllers/admin_controller.dart';
 import 'controllers/search_controller.dart';
+import 'controllers/discussion_controller.dart';
 
 import 'views/auth/login_screen.dart';
 import 'views/home/home_screen.dart';
@@ -56,8 +60,13 @@ void main() async {
   );
   final userRepo = UserRepository(prefs);
   final ragRepo = RagRepository();
+  final discussionRepo = DiscussionRepository(localCache: localCache);
+  final subjectRepo = SubjectRepository(localCache: localCache);
 
-  // 4. 初始化服務
+  // 4. 初始化跨平台離線 AI 模型管理器
+  final offlineModelManager = OfflineModelManager(prefs);
+
+  // 5. 初始化雲端服務
   final remoteConfigService = RemoteConfigService();
   await remoteConfigService.fetchAndActivate();
 
@@ -66,6 +75,7 @@ void main() async {
     rtdbDatasource: rtdbDatasource,
     remoteConfigService: remoteConfigService,
     connectivity: connectivity,
+    offlineModelManager: offlineModelManager,
   );
 
   final playBillingService = PlayBillingService(userRepository: userRepo);
@@ -78,8 +88,11 @@ void main() async {
       repoFactory: repoFactory,
       userRepo: userRepo,
       ragRepo: ragRepo,
+      discussionRepo: discussionRepo,
+      subjectRepo: subjectRepo,
       remoteConfigService: remoteConfigService,
       aiService: aiService,
+      offlineModelManager: offlineModelManager,
       playBillingService: playBillingService,
     ),
   );
@@ -92,8 +105,11 @@ class PassExamAppRoot extends StatelessWidget {
   final RepositoryFactory repoFactory;
   final IUserRepository userRepo;
   final IRagRepository ragRepo;
+  final IDiscussionRepository discussionRepo;
+  final ISubjectRepository subjectRepo;
   final RemoteConfigService remoteConfigService;
   final AiService aiService;
+  final OfflineModelManager offlineModelManager;
   final PlayBillingService playBillingService;
 
   const PassExamAppRoot({
@@ -104,8 +120,11 @@ class PassExamAppRoot extends StatelessWidget {
     required this.repoFactory,
     required this.userRepo,
     required this.ragRepo,
+    required this.discussionRepo,
+    required this.subjectRepo,
     required this.remoteConfigService,
     required this.aiService,
+    required this.offlineModelManager,
     required this.playBillingService,
   });
 
@@ -116,13 +135,20 @@ class PassExamAppRoot extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => ThemeLocaleController(prefs),
         ),
+        ChangeNotifierProvider.value(
+          value: offlineModelManager,
+        ),
         ChangeNotifierProvider(
           create: (_) => AuthController(userRepository: userRepo)..initialize(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => DiscussionController(repository: discussionRepo),
         ),
         ChangeNotifierProvider(
           create: (_) => ExamController(
             repositoryFactory: repoFactory,
             localCache: localCache,
+            subjectRepository: subjectRepo,
           )..loadQuestionsForSubject(AppConstants.defaultSubjectId),
         ),
         ChangeNotifierProvider(

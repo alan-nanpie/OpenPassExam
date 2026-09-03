@@ -18,6 +18,7 @@ class _AiConfigManagementScreenState extends State<AiConfigManagementScreen> {
   late double _temperature;
   late int _maxTokens;
   late int _thinkingBudget;
+  late bool _preferOffline;
 
   @override
   void initState() {
@@ -31,6 +32,7 @@ class _AiConfigManagementScreenState extends State<AiConfigManagementScreen> {
     _temperature = cfg.temperature;
     _maxTokens = cfg.maxTokens;
     _thinkingBudget = cfg.thinkingBudget;
+    _preferOffline = cfg.preferOffline;
   }
 
   @override
@@ -95,23 +97,23 @@ class _AiConfigManagementScreenState extends State<AiConfigManagementScreen> {
             ),
           ),
 
-        // 主力雲端模型
+        // 主力雲端模型 (第二優先)
         TextFormField(
           controller: _primaryModelController,
           decoration: const InputDecoration(
-            labelText: '雲端主力 AI 模型 (Primary Cloud Model)',
-            hintText: 'gemini-3.7-flash',
+            labelText: '雲端主力 AI 模型 (第 2 優先多模態)',
+            hintText: 'gemini-3.8-flash',
             border: OutlineInputBorder(),
             prefixIcon: Icon(Icons.cloud_done),
           ),
         ),
         const SizedBox(height: 14),
 
-        // 降級模型
+        // 降級模型 (第三優先備用)
         TextFormField(
           controller: _fallbackModelController,
           decoration: const InputDecoration(
-            labelText: '雲端降級 AI 模型 (Fallback Cloud Model)',
+            labelText: '雲端降級備用 AI 模型 (第 3 優先主流穩定)',
             hintText: 'gemini-2.5-flash',
             border: OutlineInputBorder(),
             prefixIcon: Icon(Icons.backup),
@@ -119,15 +121,25 @@ class _AiConfigManagementScreenState extends State<AiConfigManagementScreen> {
         ),
         const SizedBox(height: 14),
 
-        // 端側離線模型
+        // 端側離線模型 (第一優先)
         TextFormField(
           controller: _onDeviceModelController,
           decoration: const InputDecoration(
-            labelText: '端側離線 AI 模型 (On-Device LiteRT Model)',
+            labelText: '端側離線 AI 模型 (第 1 優先 On-Device / Web Nano)',
             hintText: 'gemma-4-2b',
             border: OutlineInputBorder(),
             prefixIcon: Icon(Icons.phone_android),
           ),
+        ),
+        const SizedBox(height: 14),
+
+        // 離線優先調度開關
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('啟用離線模型為第 1 優先 (Prefer Offline First)', style: TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: const Text('考題分析優先於本機端側推論，無網路時亦 100% 可用', style: TextStyle(fontSize: 12)),
+          value: _preferOffline,
+          onChanged: (v) => setState(() => _preferOffline = v),
         ),
         const SizedBox(height: 20),
 
@@ -240,6 +252,7 @@ class _AiConfigManagementScreenState extends State<AiConfigManagementScreen> {
         temperature: _temperature,
         maxTokens: _maxTokens,
         thinkingBudget: _thinkingBudget,
+        preferOffline: _preferOffline,
       ),
     );
   }

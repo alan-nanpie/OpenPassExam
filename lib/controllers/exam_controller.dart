@@ -5,15 +5,21 @@ import '../data/models/question.dart';
 import '../data/models/wrong_question.dart';
 import '../data/datasources/local_persistent_cache.dart';
 import '../data/repositories/repository_factory.dart';
+import '../data/repositories/subject_repository.dart';
+import '../core/constants/exam_subjects_data.dart';
 
 class ExamController extends ChangeNotifier {
   final RepositoryFactory repositoryFactory;
   final LocalPersistentCache localCache;
+  final ISubjectRepository? subjectRepository;
 
   String _currentSubjectId = AppConstants.defaultSubjectId;
   List<Question> _questions = [];
   int _currentIndex = 0;
   bool _isLoading = false;
+
+  // 考試科目集合
+  List<ExamSubject> _allSubjects = [];
 
   // 使用者目前的作答狀態
   final Set<int> _selectedOptionIndices = {};
@@ -26,7 +32,46 @@ class ExamController extends ChangeNotifier {
   ExamController({
     required this.repositoryFactory,
     required this.localCache,
-  });
+    this.subjectRepository,
+  }) {
+    loadAllSubjects();
+  }
+
+  List<ExamSubject> get allSubjects =>
+      _allSubjects.isNotEmpty ? _allSubjects : ExamSubjectsData.allSubjects;
+  List<ExamSubject> get officialSubjects => allSubjects.where((s) => s.isOfficial).toList();
+  List<ExamSubject> get customSubjects => allSubjects.where((s) => !s.isOfficial).toList();
+
+  Future<void> loadAllSubjects() async {
+    if (subjectRepository != null) {
+      _allSubjects = await subjectRepository!.getAllSubjects();
+    } else {
+      _allSubjects = List.from(ExamSubjectsData.allSubjects);
+    }
+    notifyListeners();
+  }
+
+  Future<void> addCustomSubject(
+    ExamSubject subject, {
+    required String currentUserId,
+    bool isAdmin = false,
+  }) async {
+    if (subjectRepository != null) {
+      await subjectRepository!.saveSubject(subject, currentUserId: currentUserId, isAdmin: isAdmin);
+    }
+    await loadAllSubjects();
+  }
+
+  Future<void> deleteCustomSubject(
+    String subjectId, {
+    required String currentUserId,
+    bool isAdmin = false,
+  }) async {
+    if (subjectRepository != null) {
+      await subjectRepository!.deleteSubject(subjectId, currentUserId: currentUserId, isAdmin: isAdmin);
+    }
+    await loadAllSubjects();
+  }
 
   String get currentSubjectId => _currentSubjectId;
   List<Question> get questions => _questions;

@@ -35,10 +35,10 @@ class AiTutorController extends ChangeNotifier {
     _messages.add(
       ChatMessage(
         id: 'msg_welcome',
-        text: '👋 您好！我是您的 PassExam AI 智慧助教。\n\n我支援 **Google Gemini 3.7 Flash Dynamic Thinking** 與端側 **Gemma 4 (2B)** 雙引擎，能以「生活化通俗比喻」破題，或手把手提供 Cisco CLI 實戰指令指引！請隨時點擊考題解析或直接向我提問。',
+        text: '👋 您好！我是您的 PassExam AI 智慧助教。\n\n我支援【三層智慧階層調度】：\n1. ⚡ **第 1 優先**：端側 **Gemma 4 (2B) / Web Nano** 純離線極速引擎（0 延遲、零網路消耗、100% 隱私）\n2. 🚀 **第 2 優先**：Google 雲端最新 **Gemini 3.8 Flash** 多模態旗艦推論\n3. 🛡️ **第 3 備用**：主流穩定 **Gemini 2.5 Flash** 降級保證！\n\n請隨時點擊考題解析或直接向我提問。',
         isUser: false,
         timestamp: DateTime.now(),
-        modelBadge: 'Gemini 3.7 Flash',
+        modelBadge: '離線優先 / Gemini 3.8 Flash',
       ),
     );
   }

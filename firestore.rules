@@ -1,0 +1,75 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 輔助驗證函式
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.role == 'admin' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+      );
+    }
+
+    function isOwner(creatorId) {
+      return isAuthenticated() && request.auth.uid == creatorId;
+    }
+
+    // 1. 各考試科目 (Exam Subjects)
+    match /exam_subjects/{subjectId} {
+      // 所有學員均可讀取考科
+      allow read: if true;
+
+      // 建立自訂科目：建立者 UID 必須為本人
+      allow create: if isAuthenticated() && (
+        request.resource.data.creatorId == request.auth.uid || isAdmin()
+      );
+
+      // 修改與刪除：僅科目建立者本人或管理員
+      allow update, delete: if isAuthenticated() && (
+        resource.data.creatorId == request.auth.uid || isAdmin()
+      );
+    }
+
+    // 2. 各考試科目的各考題 (Questions)
+    match /exam_subjects/{subjectId}/questions/{questionId} {
+      // 所有學員均可讀取考題進行練習刷題
+      allow read: if true;
+
+      // 建立新考題：creatorId 必須等於自己的 UID
+      allow create: if isAuthenticated() && (
+        request.resource.data.creatorId == request.auth.uid || isAdmin()
+      );
+
+      // 修改與刪除：僅考題建立者本人或管理員有權限；其他人嚴格唯讀！
+      allow update, delete: if isAuthenticated() && (
+        resource.data.creatorId == request.auth.uid || isAdmin()
+      );
+    }
+
+    // 3. 各考題內的討論區留言 (Question Discussion Comments)
+    match /exam_subjects/{subjectId}/questions/{questionId}/comments/{commentId} {
+      // 所有人均可檢視題目討論區
+      allow read: if true;
+
+      // 登入學員均可發表討論，且 authorId 必須等於自己的 UID
+      allow create: if isAuthenticated() && (
+        request.resource.data.authorId == request.auth.uid || isAdmin()
+      );
+
+      // 僅留言原作者本人或管理員可以修改/刪除；嚴格禁止竄改他人留言！
+      allow update, delete: if isAuthenticated() && (
+        resource.data.authorId == request.auth.uid || isAdmin()
+      );
+    }
+
+    // 4. 使用者個人資料 (Users)
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+    }
+  }
+}

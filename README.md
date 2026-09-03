@@ -47,6 +47,52 @@
 
 ---
 
+## 🛠️ 任何人如何自行申請、建置與執行 (Self-Hosting & Quick Start)
+
+因本公開倉庫嚴格遵循**零機密外洩 (Zero-Secret-Leakage)** 原則，所有 API 金鑰與敏感雲端設定均已徹底解耦。任何使用者均可依照以下 3 個步驟，免費申請個人專屬資源並在本地或雲端完整運行本系統：
+
+### 步驟 1：免費申請個人專屬 Google Gemini API Key (BYOK 模式)
+1. 前往 **[Google AI Studio](https://aistudio.google.com/)**。
+2. 使用任何 Google 帳號登入。
+3. 點擊畫面左側 **「Get API key」** ➔ **「Create API key」**。
+4. 複製取得開頭為 `AIzaSy...` 的專屬金鑰。
+5. 啟動本 App 後，在 **「設定 ➔ Gemini API Key」** 或 **「AI 導師畫面」** 貼上即可享受個人專屬高配額免費調用！
+
+### 步驟 2：本機端快速編譯與執行 (Local Development)
+需先安裝 [Flutter SDK (3.x 或更新版本)](https://docs.flutter.dev/get-started/install)：
+```bash
+# 1. 複製專案原始碼
+git clone https://github.com/alan-nanpie/OpenPassExam.git
+cd OpenPassExam
+
+# 2. 下載 Dart 依賴套件
+flutter pub get
+
+# 3. 執行全套 41 項自動化單元測試確保環境正常
+flutter test
+
+# 4. 以 Chrome 網頁版或 Windows 桌面版啟動
+flutter run -d chrome
+# 或
+flutter run -d windows
+```
+
+### 步驟 3：自行部署至專屬 Google Cloud Run (免費無伺服器託管)
+若您想擁有自己專屬的線上題庫網址：
+1. 前往 [Google Cloud Console](https://console.cloud.google.com/) 免費建立一個 GCP 專案（例如 `my-passexam-project`）。
+2. 在本地複製範例設定檔：
+   ```powershell
+   copy scripts\deploy.env.example scripts\deploy.env
+   ```
+3. 用記事本開啟 `scripts/deploy.env`，將 `GCP_PROJECT_ID=your-gcp-project-id` 修改為您建立的專案 ID。
+4. 在 PowerShell 執行一鍵自動部署：
+   ```powershell
+   .\deploy.ps1
+   ```
+   腳本將全自動啟用 APIs、建立容器庫、雲端編譯並部署，完成後將在終端機輸出專屬的公開 HTTPS 網址！
+
+---
+
 ## 📂 完整技術文檔地圖 (Documentation Map)
 
 全套完整雙語（繁體中文 `zh-TW` 與英文 `en`）技術文檔收錄於 [`docs_opensource/`](./docs_opensource/)：

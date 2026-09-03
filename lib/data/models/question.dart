@@ -12,6 +12,10 @@ class Question {
   final String? imageUrl;
   final bool isApproved;
   final String? englishGrammarNotes; // 從考題學英文分析
+  final String creatorId; // 建立者 UID (例如 'system' 或使用者 uid)
+  final String? creatorName; // 建立者顯示名稱
+  final bool isPublic; // 是否公開供其他使用者讀取
+  final DateTime? updatedAt;
 
   Question({
     required this.id,
@@ -27,7 +31,23 @@ class Question {
     this.imageUrl,
     required this.isApproved,
     this.englishGrammarNotes,
+    this.creatorId = 'system',
+    this.creatorName = 'PassExam 官方教研組',
+    this.isPublic = true,
+    this.updatedAt,
   });
+
+  /// 檢查當前使用者是否為該考題的建立者本人
+  bool isOwner(String? currentUid) {
+    if (currentUid == null || currentUid.isEmpty) return false;
+    return creatorId == currentUid;
+  }
+
+  /// 判斷是否有編輯或刪除此考題的權限 (建立者本人或管理員)
+  bool canEdit({String? currentUid, bool isAdmin = false}) {
+    if (isAdmin) return true;
+    return isOwner(currentUid);
+  }
 
   factory Question.fromMap(Map<String, dynamic> map) {
     return Question(
@@ -51,6 +71,10 @@ class Question {
       imageUrl: (map['imageUrl'] ?? map['image_url'])?.toString(),
       isApproved: map['isApproved'] ?? map['is_approved'] ?? true,
       englishGrammarNotes: (map['englishGrammarNotes'] ?? map['english_grammar_notes'])?.toString(),
+      creatorId: (map['creatorId'] ?? map['creator_id'] ?? 'system').toString(),
+      creatorName: (map['creatorName'] ?? map['creator_name'] ?? 'PassExam 官方教研組').toString(),
+      isPublic: map['isPublic'] ?? map['is_public'] ?? true,
+      updatedAt: map['updatedAt'] != null ? DateTime.tryParse(map['updatedAt'].toString()) : null,
     );
   }
 
@@ -69,6 +93,10 @@ class Question {
       'imageUrl': imageUrl,
       'isApproved': isApproved,
       'englishGrammarNotes': englishGrammarNotes,
+      'creatorId': creatorId,
+      'creatorName': creatorName,
+      'isPublic': isPublic,
+      'updatedAt': updatedAt?.toIso8601String(),
     };
   }
 
@@ -86,6 +114,10 @@ class Question {
     String? imageUrl,
     bool? isApproved,
     String? englishGrammarNotes,
+    String? creatorId,
+    String? creatorName,
+    bool? isPublic,
+    DateTime? updatedAt,
   }) {
     return Question(
       id: id ?? this.id,
@@ -101,6 +133,10 @@ class Question {
       imageUrl: imageUrl ?? this.imageUrl,
       isApproved: isApproved ?? this.isApproved,
       englishGrammarNotes: englishGrammarNotes ?? this.englishGrammarNotes,
+      creatorId: creatorId ?? this.creatorId,
+      creatorName: creatorName ?? this.creatorName,
+      isPublic: isPublic ?? this.isPublic,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 }

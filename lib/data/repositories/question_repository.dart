@@ -7,8 +7,16 @@ abstract class IQuestionRepository {
   Future<List<Question>> getQuestions({bool forceRefresh = false});
   Future<Question?> getQuestionById(String id);
   Future<List<Question>> getQuestionsByDomain(String domain);
-  Future<void> saveQuestion(Question question);
-  Future<void> deleteQuestion(String id);
+  Future<void> saveQuestion(
+    Question question, {
+    String? currentUserId,
+    bool isAdmin = false,
+  });
+  Future<void> deleteQuestion(
+    String id, {
+    String? currentUserId,
+    bool isAdmin = false,
+  });
   Future<void> approveAllQuestions();
   Future<void> setQuestionApproval(String id, bool isApproved);
 }
@@ -60,6 +68,8 @@ class FirestoreQuestionRepository implements IQuestionRepository {
           imageUrl: null,
           isApproved: true,
           englishGrammarNotes: '核心詞彙：`Modular Design`, `High Availability (HA)`, `Hierarchical Architecture`.',
+          creatorId: 'system',
+          creatorName: 'PassExam 官方教研組',
         ),
       );
     }
@@ -86,10 +96,19 @@ class FirestoreQuestionRepository implements IQuestionRepository {
   }
 
   @override
-  Future<void> saveQuestion(Question question) async {
+  Future<void> saveQuestion(
+    Question question, {
+    String? currentUserId,
+    bool isAdmin = false,
+  }) async {
     final questions = await getQuestions();
     final index = questions.indexWhere((q) => q.id == question.id);
     if (index >= 0) {
+      final existing = questions[index];
+      // 嚴格權限檢查：只有原建立者本人或管理員可以更新題目！其他人僅限唯讀
+      if (currentUserId != null && !existing.canEdit(currentUid: currentUserId, isAdmin: isAdmin)) {
+        throw Exception('【權限不足】：您不是此考題的建立者，僅能進行讀取，無法修改他人建立之考題！');
+      }
       questions[index] = question;
     } else {
       questions.add(question);
@@ -107,17 +126,29 @@ class FirestoreQuestionRepository implements IQuestionRepository {
   }
 
   @override
-  Future<void> deleteQuestion(String id) async {
+  Future<void> deleteQuestion(
+    String id, {
+    String? currentUserId,
+    bool isAdmin = false,
+  }) async {
     final questions = await getQuestions();
-    questions.removeWhere((q) => q.id == id);
-    await localCache.saveQuestions(subjectId, questions);
+    final index = questions.indexWhere((q) => q.id == id);
+    if (index >= 0) {
+      final existing = questions[index];
+      // 嚴格權限檢查：只有原建立者本人或管理員可以刪除題目！
+      if (currentUserId != null && !existing.canEdit(currentUid: currentUserId, isAdmin: isAdmin)) {
+        throw Exception('【權限不足】：您不是此考題的建立者，無法刪除他人建立之考題！');
+      }
+      questions.removeAt(index);
+      await localCache.saveQuestions(subjectId, questions);
 
-    await localCache.enqueueMutation({
-      'action': 'DELETE_QUESTION',
-      'subjectId': subjectId,
-      'questionId': id,
-      'timestamp': DateTime.now().toIso8601String(),
-    });
+      await localCache.enqueueMutation({
+        'action': 'DELETE_QUESTION',
+        'subjectId': subjectId,
+        'questionId': id,
+        'timestamp': DateTime.now().toIso8601String(),
+      });
+    }
   }
 
   @override

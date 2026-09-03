@@ -9,8 +9,10 @@ import '../../controllers/notes_controller.dart';
 import '../../data/models/question.dart';
 import '../../services/tts_voice_service.dart';
 import '../ai_tutor/ai_tutor_screen.dart';
+import '../admin/question_editor_screen.dart';
 import 'question_card_widget.dart';
 import 'english_learning_card_widget.dart';
+import 'question_discussion_sheet.dart';
 
 class PracticeScreen extends StatefulWidget {
   final String subjectId;
@@ -61,6 +63,8 @@ class _PracticeScreenState extends State<PracticeScreen> {
   @override
   Widget build(BuildContext context) {
     final examCtrl = context.watch<ExamController>();
+    final authCtrl = context.watch<AuthController>();
+    final currentUser = authCtrl.currentUser;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (examCtrl.isLoading) {
@@ -70,6 +74,10 @@ class _PracticeScreenState extends State<PracticeScreen> {
     }
 
     final question = examCtrl.currentQuestion;
+    final canEditQuestion = question != null && question.canEdit(
+      currentUid: currentUser?.uid,
+      isAdmin: currentUser?.isAdmin ?? false,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -81,6 +89,27 @@ class _PracticeScreenState extends State<PracticeScreen> {
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         actions: [
+          // 考題討論區 (Discussion) 入口
+          IconButton(
+            icon: const Icon(Icons.forum_outlined),
+            tooltip: '考題討論區',
+            onPressed: question == null
+                ? null
+                : () => QuestionDiscussionSheet.show(context, question),
+          ),
+          // 建立者本人專屬：直接編輯此考題
+          if (canEditQuestion)
+            IconButton(
+              icon: const Icon(Icons.edit_document),
+              tooltip: '編輯我建立的考題',
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => QuestionEditorScreen(initialQuestion: question),
+                  ),
+                );
+              },
+            ),
           // 語音朗讀 (TTS) 按鈕
           IconButton(
             icon: Icon(_isTtsPlaying ? Icons.volume_up : Icons.volume_up_outlined),
@@ -117,6 +146,44 @@ class _PracticeScreenState extends State<PracticeScreen> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                // 考題所有權限標示卡片
+                Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: canEditQuestion
+                        ? AppColors.primary.withValues(alpha: 0.08)
+                        : (isDark ? AppColors.darkCard : const Color(0xFFF1F3F4)),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: canEditQuestion
+                          ? AppColors.primary.withValues(alpha: 0.3)
+                          : (isDark ? AppColors.darkDivider : AppColors.lightDivider),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        canEditQuestion ? Icons.verified_user : Icons.lock_outline,
+                        size: 14,
+                        color: canEditQuestion ? AppColors.primary : Colors.grey,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        canEditQuestion
+                            ? (question.isOwner(currentUser?.uid)
+                                ? '⭐ 您是本題建立者（具備完整 CRUD 權限）'
+                                : '🛡️ 管理員權限（具備完整 CRUD 權限）')
+                            : '👤 建立者：${question.creatorName ?? "其他使用者"}（您享有練習刷題與討論讀取權限）',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: canEditQuestion ? FontWeight.bold : FontWeight.normal,
+                          color: canEditQuestion ? AppColors.primary : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 QuestionCardWidget(
                   question: question,
                   selectedOptions: examCtrl.selectedOptionIndices,

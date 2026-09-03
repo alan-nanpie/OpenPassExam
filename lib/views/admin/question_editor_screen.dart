@@ -4,12 +4,18 @@ import 'package:uuid/uuid.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/exam_subjects_data.dart';
 import '../../controllers/admin_controller.dart';
+import '../../controllers/auth_controller.dart';
 import '../../data/models/question.dart';
 
 class QuestionEditorScreen extends StatefulWidget {
   final Question? initialQuestion;
+  final String? defaultSubjectId;
 
-  const QuestionEditorScreen({super.key, this.initialQuestion});
+  const QuestionEditorScreen({
+    super.key,
+    this.initialQuestion,
+    this.defaultSubjectId,
+  });
 
   @override
   State<QuestionEditorScreen> createState() => _QuestionEditorScreenState();
@@ -40,6 +46,9 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.defaultSubjectId != null) {
+      _subjectId = widget.defaultSubjectId!;
+    }
     final q = widget.initialQuestion;
     if (q != null) {
       _subjectId = q.examId;
@@ -260,6 +269,24 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
                 ),
                 onPressed: () async {
                   if (_formKey.currentState?.validate() ?? false) {
+                    final authCtrl = context.read<AuthController>();
+                    final currentUser = authCtrl.currentUser;
+
+                    // 若正在編輯既有考題，檢查是否具備編輯權限
+                    if (widget.initialQuestion != null &&
+                        !widget.initialQuestion!.canEdit(
+                          currentUid: currentUser?.uid,
+                          isAdmin: currentUser?.isAdmin ?? false,
+                        )) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('❌ 權限不足：您不是此考題的建立者，僅能讀取，無法修改他人建立之考題！'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
+
                     final options = _optionControllers.map((c) => c.text.trim()).where((t) => t.isNotEmpty).toList();
                     if (options.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -282,17 +309,30 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
                       imageUrl: _imageUrlController.text.trim().isNotEmpty ? _imageUrlController.text.trim() : null,
                       isApproved: true,
                       englishGrammarNotes: _grammarNotesController.text.trim(),
+                      creatorId: widget.initialQuestion?.creatorId ?? currentUser?.uid ?? 'guest',
+                      creatorName: widget.initialQuestion?.creatorName ?? currentUser?.displayName ?? '學員',
+                      updatedAt: DateTime.now(),
                     );
 
-                    await adminCtrl.saveQuestion(
-                      subjectId: _subjectId,
-                      question: newQuestion,
-                    );
-
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('✅ 考題已成功儲存！')),
+                    try {
+                      await adminCtrl.saveQuestion(
+                        subjectId: _subjectId,
+                        question: newQuestion,
+                        currentUserId: currentUser?.uid,
+                        isAdmin: currentUser?.isAdmin ?? false,
                       );
+
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('✅ 考題已成功儲存！')),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('❌ 儲存失敗：$e'), backgroundColor: Colors.red),
+                        );
+                      }
                     }
                   }
                 },

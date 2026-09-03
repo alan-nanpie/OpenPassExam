@@ -7,6 +7,8 @@ import '../models/note_item.dart';
 import '../models/exam_session.dart';
 import '../models/study_artifact.dart';
 import '../models/ai_model_config.dart';
+import '../models/question_comment.dart';
+import '../models/exam_subject.dart';
 
 class LocalPersistentCache {
   final SharedPreferences _prefs;
@@ -158,5 +160,43 @@ class LocalPersistentCache {
 
   Future<void> clearUserGeminiApiKey() async {
     await _prefs.remove(AppConstants.prefKeyUserGeminiApiKey);
+  }
+
+  // 9. 考題討論區留言快取
+  Future<void> saveComments(String questionId, List<QuestionComment> comments) async {
+    final key = 'comments_cache_$questionId';
+    final jsonList = comments.map((c) => c.toMap()).toList();
+    await _prefs.setString(key, jsonEncode(jsonList));
+  }
+
+  List<QuestionComment>? getCachedComments(String questionId) {
+    final key = 'comments_cache_$questionId';
+    final raw = _prefs.getString(key);
+    if (raw == null) return null;
+    try {
+      final decoded = jsonDecode(raw) as List;
+      return decoded.map((e) => QuestionComment.fromMap(Map<String, dynamic>.from(e))).toList();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // 10. 學員社群自建考試科目快取 (UGC Custom Exam Subjects)
+  Future<void> saveCustomSubjects(List<ExamSubject> subjects) async {
+    const key = 'custom_exam_subjects_cache';
+    final jsonList = subjects.map((s) => s.toMap()).toList();
+    await _prefs.setString(key, jsonEncode(jsonList));
+  }
+
+  List<ExamSubject> getCachedCustomSubjects() {
+    const key = 'custom_exam_subjects_cache';
+    final raw = _prefs.getString(key);
+    if (raw == null) return [];
+    try {
+      final decoded = jsonDecode(raw) as List;
+      return decoded.map((e) => ExamSubject.fromMap(Map<String, dynamic>.from(e))).toList();
+    } catch (_) {
+      return [];
+    }
   }
 }

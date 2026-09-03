@@ -3,10 +3,12 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../controllers/exam_controller.dart';
+import '../../controllers/auth_controller.dart';
 import '../../data/models/exam_subject.dart';
 import '../practice/practice_screen.dart';
 import '../mock_exam/mock_exam_screen.dart';
 import '../notebooklm/notebooklm_screen.dart';
+import '../admin/question_editor_screen.dart';
 
 class SubjectDetailScreen extends StatelessWidget {
   final ExamSubject subject;
@@ -16,14 +18,76 @@ class SubjectDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final auth = context.watch<AuthController>();
+    final examCtrl = context.watch<ExamController>();
+    final user = auth.currentUser;
+    final canManageThisSubject = subject.canEdit(currentUid: user?.uid, isAdmin: user?.isAdmin ?? false);
 
     return Scaffold(
       appBar: AppBar(
         title: Text(subject.code),
+        actions: [
+          if (canManageThisSubject && !subject.isOfficial)
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.red),
+              tooltip: '刪除此自訂科目',
+              onPressed: () => _confirmDeleteSubject(context, examCtrl, user?.uid ?? ''),
+            ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // 建立者 / 管理員出題管理專區
+          if (canManageThisSubject)
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.edit_note, color: AppColors.primary, size: 28),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          subject.isOwner(user?.uid) ? '⭐ 您是本科目的建立者' : '👑 系統管理員權限',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        const Text(
+                          '您可以在本科目下自由新增、編修考題，供全體學員練習',
+                          style: TextStyle(fontSize: 11.5, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('新增考題'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => QuestionEditorScreen(
+                            defaultSubjectId: subject.id,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+
           // 頂部資訊卡片
           Container(
             padding: const EdgeInsets.all(18),
@@ -77,6 +141,28 @@ class SubjectDetailScreen extends StatelessWidget {
                     color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                     height: 1.4,
                   ),
+                ),
+                const SizedBox(height: 12),
+                // 建立者標籤
+                Row(
+                  children: [
+                    Icon(
+                      subject.isOfficial ? Icons.verified : Icons.account_circle,
+                      size: 15,
+                      color: subject.isOfficial ? AppColors.primary : Colors.teal,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      subject.isOfficial
+                          ? '原廠官方認證科目 (Cisco Official)'
+                          : '建立者：${subject.creatorName ?? "社群學員"} ${subject.isOwner(user?.uid) ? "(您建立的)" : ""}',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: subject.isOfficial ? AppColors.primary : Colors.teal,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -183,6 +269,51 @@ class SubjectDetailScreen extends StatelessWidget {
               ),
             );
           }),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteSubject(BuildContext context, ExamController examCtrl, String currentUid) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('刪除自訂考試科目'),
+        content: Text('確定要永久刪除【${subject.code} ${subject.title}】及其相關考題嗎？此動作無法復原。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                await examCtrl.deleteCustomSubject(
+                  subject.id,
+                  currentUserId: currentUid,
+                  isAdmin: false,
+                );
+                if (context.mounted) {
+                  Navigator.pop(context); // 回到科目列表
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('已刪除科目【${subject.code}】')),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+                  );
+                }
+              }
+            },
+            child: const Text('確定刪除'),
+          ),
         ],
       ),
     );
