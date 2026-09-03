@@ -12,7 +12,7 @@ void main() {
       );
 
       expect(response.contains('PassExam'), true);
-      expect(response.contains('針對您的提問'), true);
+      expect(response.contains('頂尖專家'), true);
       expect(response.contains('端側 Gemma 4 (2B)'), true);
     });
 
@@ -28,7 +28,7 @@ void main() {
       expect(response.contains('Device# configure terminal'), true);
     });
 
-    test('能夠針對學員提出的 VLAN 問題，結合 Persona 給予隔音玻璃帷幕比喻與交換器說明', () {
+    test('能夠針對學員提出的 VLAN 問題，結合頂尖專家視角給予 IEEE 802.1Q 標籤與交換技術深層解析', () {
       final response = AiOfflineReasoningEngine.generateResponse(
         prompt: '什麼是 VLAN？它有什麼好處？',
         persona: AiPersona.friendlyTutor,
@@ -36,7 +36,8 @@ void main() {
 
       expect(response.contains('VLAN'), true);
       expect(response.contains('廣播網域'), true);
-      expect(response.contains('隔音玻璃帷幕'), true);
+      expect(response.contains('802.1Q'), true);
+      expect(response.contains('TPID'), true);
     });
 
     test('能夠針對學員提出的雲端運算 (AWS/GCP) 問題，給予架構設計分析', () {
@@ -47,7 +48,7 @@ void main() {
 
       expect(response.contains('雲端'), true);
       expect(response.contains('無伺服器與容器化'), true);
-      expect(response.contains('CCIE 首席架構設計'), true);
+      expect(response.contains('首席架構師全域設計'), true);
     });
 
     test('當有考題上下文時，解答能包含考題題目與選項解析', () {

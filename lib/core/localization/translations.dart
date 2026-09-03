@@ -81,9 +81,9 @@ class Translations {
       'current_ai_engine': '目前 AI 調度: {model}',
       'ai_layer_info': '調度層級: {layer}',
       'offline_gemma_banner': '⚡ 目前處於離線狀態，已自動調度端側 Gemma 4 (2B) 4096 tokens 模型！',
-      'life_metaphor_tab': '生活化比喻',
-      'cisco_cli_tab': 'Cisco CLI 逐步配置',
-      'expert_architecture_tab': 'CCIE 首席架構解析',
+      'life_metaphor_tab': '頂尖專家深度剖析',
+      'cisco_cli_tab': '資深工程師實戰指引',
+      'expert_architecture_tab': '首席架構顧問諮詢',
 
       // NotebookLM 工作區
       'notebooklm_title': 'NotebookLM 官方教材學習工作區',
@@ -210,9 +210,9 @@ class Translations {
       'current_ai_engine': 'AI Engine: {model}',
       'ai_layer_info': 'Source Layer: {layer}',
       'offline_gemma_banner': '⚡ Offline mode detected. Switched to On-device Gemma 4 (2B) 4096 tokens model!',
-      'life_metaphor_tab': 'Life Metaphor',
-      'cisco_cli_tab': 'Cisco CLI Guide',
-      'expert_architecture_tab': 'CCIE Architecture Analysis',
+      'life_metaphor_tab': 'Domain Expert Analysis',
+      'cisco_cli_tab': 'Senior Engineer Lab Guide',
+      'expert_architecture_tab': 'Chief Architect Advisory',
 
       'notebooklm_title': 'NotebookLM Study Workspace',
       'load_gcs_rag': '☁️ Load Google Cloud GCS Official RAG Chunks',

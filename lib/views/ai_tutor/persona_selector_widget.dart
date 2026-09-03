@@ -23,7 +23,7 @@ class PersonaSelectorWidget extends StatelessWidget {
           _buildChip(
             context,
             persona: AiPersona.friendlyTutor,
-            icon: Icons.lightbulb_outline,
+            icon: Icons.psychology,
             label: context.tr('life_metaphor_tab'),
           ),
           const SizedBox(width: 8),

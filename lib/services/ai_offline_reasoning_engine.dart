@@ -44,38 +44,34 @@ class AiOfflineReasoningEngine {
       }
     }
 
-    // 2. 針對學員提問之核心解答 (Direct Answer)
-    sb.writeln('### 💡 針對您的提問：「$cleanPrompt」\n');
+    // 2. 針對提問進行領域頂尖專家與首席顧問之核心深度解答
+    sb.writeln('### 💡 頂尖專家專業剖析：「$cleanPrompt」\n');
 
-    // 依據問題內容判斷主題並動態生成精準回答
+    // 依據問題內容判斷主題並動態生成極致詳盡之技術解答
     _generateTopicSpecificAnswer(sb, cleanPrompt, lowerPrompt, question, persona);
 
-    // 3. 依據 Persona 角色風格提供相應專業內容
-    sb.writeln('\n### 🎓 助教專業深度解析');
+    // 3. 領域首席顧問進階架構與實踐指引
+    sb.writeln('\n### 🏛️ 首席技術顧問實務與架構指引');
     switch (persona) {
       case AiPersona.friendlyTutor:
-        sb.writeln('#### 🌟 生活化觀念破題 (1 秒秒懂)');
-        _generateFriendlyAnalogy(sb, lowerPrompt);
+        sb.writeln('#### 🔬 技術核心機制與規範深度剖析 (RFC / Architecture Details)');
+        _generateExpertDeepDive(sb, lowerPrompt);
         break;
 
       case AiPersona.cliEngineer:
-        sb.writeln('#### 🛠️ 實戰指令操作與驗證指引');
+        sb.writeln('#### 🛠️ 企業級工程實戰配置與深入排錯 (Production Deployment & Troubleshooting)');
         _generateCliGuide(sb, lowerPrompt);
         break;
 
       case AiPersona.ccieArchitect:
-        sb.writeln('#### 🏛️ CCIE 首席架構設計與故障排除思路');
+        sb.writeln('#### 📐 首席架構師全域設計、效能瓶頸與權衡分析 (Trade-offs & Resilience)');
         _generateArchitectAdvice(sb, lowerPrompt);
         break;
     }
 
-    // 4. 考試必考陷阱與注意事項
-    sb.writeln('\n#### ⚠️ 認證考試重點陷阱 (Exam Watch)');
-    _generateExamTips(sb, lowerPrompt);
-
-    // 5. 參考教材切片 (若有檢索到)
+    // 4. 參考教材與標準規範切片 (若有檢索到)
     if (ragChunks != null && ragChunks.isNotEmpty) {
-      sb.writeln('\n#### 📚 關聯教科書官方切片 (RAG References)');
+      sb.writeln('\n#### 📚 官方規範與教材知識庫 (RAG References)');
       for (final chunk in ragChunks) {
         sb.writeln('- 📖 **${chunk.bookTitle} (第 ${chunk.pageNumber} 頁)**: ${chunk.content.trim()}');
       }
@@ -93,17 +89,17 @@ class AiOfflineReasoningEngine {
   ) {
     // 招呼語判斷
     if (lower.contains('你好') || lower.contains('哈囉') || lower.contains('hello') || lower.contains('hi') || lower.contains('早安') || lower.contains('午安') || lower.contains('晚安')) {
-      sb.writeln('您好！我是您的專屬 **PassExam AI 學習導師**。我能隨時為您解答各大專業認證（如 Cisco CCNA/CCNP、AWS 雲端架構、程式開發、網路協定與系統設計）的任何疑問！');
-      sb.writeln('您可以：\n1. 提出觀念問題（例如：「什麼是 OSPF 與 BGP 的差異？」、「子網路遮罩如何計算？」）\n2. 點擊考題並請我針對題目、選項與拓撲進行深度解析。\n3. 請教 CLI 配置指令或架構排錯思路！');
+      sb.writeln('您好！我是您的 **PassExam 專屬領域首席技術顧問與頂尖專家**。我專精於網路通訊協定、企業級系統架構、雲端原生技術、資訊安全與各項全球頂尖技術認證。');
+      sb.writeln('無論您提出任何專業理論、RFC 規範、生產環境實戰故障排除、指令配置細節或架構選型評估，我都將以業界頂尖專家的規格為您提供最權威且詳盡的完整剖析！');
       return;
     }
 
     // 詢問自己身分
     if (lower.contains('你是誰') || lower.contains('你是') || lower.contains('介紹自己') || lower.contains('who are you')) {
-      sb.writeln('我是 **PassExam 跨平台多模態 AI 智慧助教**，具備【三層智慧階層調度】：');
-      sb.writeln('- ⚡ **端側離線**：支援 Google Gemma 4 (2B) 與 Chrome Nano 引擎，無網際網路環境下依然能流暢回答！');
-      sb.writeln('- ☁️ **雲端旗艦**：支援 Google 最新 Gemini 3.8 / 2.5 Flash 多模態架構，具備高深度推理能力。');
-      sb.writeln('- 🎯 **教材融合**：深度結合官方考題、RAG 教科書知識庫與 Cisco / 雲端實戰經驗。');
+      sb.writeln('我是 **PassExam 領域頂尖專家與首席技術顧問**，具備【端側離線與雲端旗艦雙引擎調度】：');
+      sb.writeln('- ⚡ **端側極速離線引擎**：支援 Google Gemma 4 (2B) 與 Web Nano，無網路狀態下仍可產出完整萬字級架構與指令剖析。');
+      sb.writeln('- ☁️ **雲端旗艦多模態**：調度 Google Gemini 2.5 Flash 旗艦架構，具備深度推理、圖文拓撲多模態分析與生產實務評估能力。');
+      sb.writeln('- 🎯 **專家諮詢定位**：徹底摒棄簡略回答與表面比喻，為您提供白皮書等級的底層機制、配置範例、架構權衡與排錯思路。');
       return;
     }
 
@@ -229,76 +225,117 @@ class AiOfflineReasoningEngine {
     sb.writeln('3. **實務建議**：在規劃架構時，需權衡頻寬成本、延遲敏感度以及容錯恢復時間 (RTO/RPO)。');
   }
 
-  static void _generateFriendlyAnalogy(StringBuffer sb, String lower) {
-    if (lower.contains('subnet') || lower.contains('ip')) {
-      sb.writeln('想像 IP 位址就像一座大型社區的「棟別與門牌號碼」：');
-      sb.writeln('- 前半段網路代碼就像「第幾棟大樓」；');
-      sb.writeln('- 後半段主機代碼就像「該大樓裡的哪一戶住戶」。');
-      sb.writeln('而子網路遮罩就像管理室的規定，決定每棟大樓可以容納多少住戶！');
-    } else if (lower.contains('vlan') || lower.contains('switch')) {
-      sb.writeln('想像一間大辦公室裡坐著財務部、研發部與業務部：');
-      sb.writeln('若不設 VLAN，財務部大聲說話（廣播）全辦公室都聽得到，既吵雜又沒有機密性；');
-      sb.writeln('劃分 VLAN 就如同在每組座位中間加裝「隔音玻璃帷幕」，不同部門各聊各的互不干擾，除非透過主管（路由器）轉達！');
+  static void _generateExpertDeepDive(StringBuffer sb, String lower) {
+    if (lower.contains('subnet') || lower.contains('ip') || lower.contains('cidr') || lower.contains('vlsm')) {
+      sb.writeln('1. **RFC 4632 無類別域間路由 (CIDR) 底層位址空間數學模型**：');
+      sb.writeln('   - IPv4 位址空間總量為 \\(2^{32} = 4,294,967,296\\) 個位址。子網路劃分本質是將主機位元借位至網路位元（Borrowing Bits）。');
+      sb.writeln('   - 每向主機位元借 1 個 bit，可劃分的子網路數即翻倍（\\(2^k\\)），而每個子網路的可用主機容量減半。');
+      sb.writeln('2. **VLSM (可變長度子網路遮罩) 規劃與點對點最佳實務**：');
+      sb.writeln('   - 骨幹路由器點對點互連建議採用 `/30`（保留 2 個可用 IP 給兩端介面）或 RFC 3021 規範的 `/31`（無廣播與網路位址，位址利用率達 100%）。');
+      sb.writeln('   - 針對終端用戶 LAN 建議採用 `/24` 或依部門規模規劃 `/25`~`/27`，並確保保留足夠位址作為 DHCP 動態分配池與網關備援 (HSRP/VRRP Virtual IP)。');
+      sb.writeln('3. **反向遮罩 (Wildcard Mask) 在 ACL 與 OSPF 中的微架構比對**：');
+      sb.writeln('   - Wildcard Mask 中的 `0` 代表「必須嚴格比對」，`1` 代表「忽略比對（Don\'t Care）」。');
+      sb.writeln('   - 專家技巧：非連續 Wildcard（如 `0.0.0.254`）可用於單一 ACL 規則比對所有奇數或偶數 IP，大幅壓縮硬體 TCAM 表項。');
+    } else if (lower.contains('vlan') || lower.contains('switch') || lower.contains('trunk') || lower.contains('stp')) {
+      sb.writeln('1. **IEEE 802.1Q 訊框封裝與 4-Byte Tag 結構細節**：');
+      sb.writeln('   - **TPID (Tag Protocol Identifier)**：固定為 `0x8100`，指示此為 802.1Q 標記訊框。');
+      sb.writeln('   - **TCI (Tag Control Information)**：包含 3-bit PCP（802.1p 服務優先級 QoS）、1-bit DEI（丟棄指示）、以及 12-bit VLAN ID（範圍 1 ~ 4094）。');
+      sb.writeln('2. **二層交換機 TCAM (Ternary Content Addressable Memory) 轉發原理**：');
+      sb.writeln('   - 交換機硬體 ASIC 在接收訊框的第一個時鐘週期即透過 MAC Address Table 進行平行查表。');
+      sb.writeln('   - 若目的 MAC 不在表項中，將觸發未知單播泛洪 (Unknown Unicast Flooding)，僅限同 VLAN 廣播域內所有連接埠。');
+      sb.writeln('3. **STP/RSTP (802.1w) 狀態機收斂與硬體加速**：');
+      sb.writeln('   - RSTP 將傳統 STP 的 5 種狀態簡化為 Discarding、Learning、Forwarding 3 種狀態。');
+      sb.writeln('   - 啟用 PortFast 與 BPDU Guard：使終端連接埠直接跳過 Listening/Learning 進入 Forwarding（0 毫秒收斂），若誤接交換機收到 BPDU 則立即 Err-Disable 保護根橋。');
+    } else if (lower.contains('ospf')) {
+      sb.writeln('1. **Dijkstra SPF 演算法與七類 LSA 鏈路狀態通告深層機制**：');
+      sb.writeln('   - **Type 1 (Router LSA)**：每台路由器在所屬區域內宣告自身介面與鏈路成本。');
+      sb.writeln('   - **Type 2 (Network LSA)**：由 DR (Designated Router) 宣告多路訪問 (Broadcast/NBMA) 網段上的所有鄰居清單。');
+      sb.writeln('   - **Type 3 (Summary LSA)**：由 ABR 宣告跨區域路由彙總，阻止 Type 1/2 泛洪至其他 Area，降低 CPU 拓撲計算開銷。');
+      sb.writeln('   - **Type 4/5 (ASBR Summary & External LSA)**：宣告外部自治系統引入之路由（如重分布靜態或 BGP 路由）。');
+      sb.writeln('2. **DR / BDR 選舉演算法與無中斷優雅重啟 (Graceful Restart)**：');
+      sb.writeln('   - 選舉條件：介面 Priority 最高者獲選（0 代表不參與選舉）；Priority 相同時以 Router ID (IPv4 格式數值最大者) 獲選。');
+      sb.writeln('   - 具備非搶佔特性（Non-preemptive）：即使網絡中加入更高優先級設備，也不會引發 DR 重選導致業務瞬斷。');
     } else {
-      sb.writeln('想像網路通訊就像現代的物流外送系統：');
-      sb.writeln('- 外送包裹上的寄件/收件地址就是 IP Header；');
-      sb.writeln('- 外送員騎車走的高速公路與省道就是實體光纖與銅線；');
-      sb.writeln('- 導航軟體推薦的最佳即時路徑，就是動態路由演算法 (Dijkstra) 計算後的結果！');
+      sb.writeln('1. **通訊協定與系統底層標準規範架構**：');
+      sb.writeln('   - 系統核心運作嚴格遵循 IETF RFC 與業界開放標準架構，定義狀態機（State Machine）轉換條件、保活計時器（Keepalive Timer）與異常容錯重試機制。');
+      sb.writeln('2. **企業級生產環境高可用性與吞吐量最佳化策略**：');
+      sb.writeln('   - 採用雙主動（Active-Active）或主備（Active-Standby）集群架構，搭配心跳檢測（Heartbeat）達成毫秒級故障轉移。');
+      sb.writeln('   - 透過快取層（如 Redis / 本機記憶體快取）消峰填谷，降低資料庫 I/O 與網路頻寬壓力。');
     }
   }
 
   static void _generateCliGuide(StringBuffer sb, String lower) {
     if (lower.contains('ospf')) {
       sb.writeln('```cisco');
-      sb.writeln('! === OSPF 進階參數微調與深入除錯 ===');
+      sb.writeln('! === 企業級 OSPF 進階微調、認證與深度排錯實戰 ===');
+      sb.writeln('Router(config)# router ospf 1');
+      sb.writeln('Router(config-router)# router-id 10.255.255.1');
+      sb.writeln('Router(config-router)# auto-cost reference-bandwidth 100000 ! 將參考頻寬調整為 100G (正確區分 10G/40G/100G 介面 Cost)');
+      sb.writeln('Router(config-router)# passive-interface default            ! 預設所有介面被動 (安全最佳實務)');
+      sb.writeln('Router(config-router)# no passive-interface GigabitEthernet0/0/0');
+      sb.writeln('');
+      sb.writeln('! 介面啟用 Cryptographic SHA 認證，杜絕非法路由注入');
       sb.writeln('Router(config)# interface GigabitEthernet0/0/0');
-      sb.writeln('Router(config-if)# ip ospf cost 10            ! 手動指定介面 Metric (覆蓋自動計算)');
-      sb.writeln('Router(config-if)# ip ospf priority 255       ! 將優先級調至最高 (確保競選為 DR)');
-      sb.writeln('Router(config-if)# ip ospf hello-interval 10   ! 調整 Hello 間隔 (兩端必須相同)');
+      sb.writeln('Router(config-if)# ip ospf authentication message-digest');
+      sb.writeln('Router(config-if)# ip ospf message-digest-key 1 md5 CiscoSecureKey2026!');
+      sb.writeln('Router(config-if)# ip ospf dead-interval 40');
+      sb.writeln('Router(config-if)# ip ospf hello-interval 10');
       sb.writeln('Router(config-if)# exit');
-      sb.writeln('! 排錯即時除錯指令：');
-      sb.writeln('Router# debug ip ospf adj                     ! 追蹤鄰居建立交握 (Adjacency) 過程');
-      sb.writeln('Router# debug ip ospf events                  ! 追蹤 SPF 計算與 LSA 泛洪事件');
-      sb.writeln('Router# undebug all                           ! 排錯完畢務必關閉除錯');
+      sb.writeln('');
+      sb.writeln('! 生產環境深入排錯與效能診斷');
+      sb.writeln('Router# show ip ospf neighbor detail          ! 檢視完整鄰居狀態、MTU 與 dead timer 倒數');
+      sb.writeln('Router# show ip ospf database summary         ! 快速盤點各區域 Type 3 LSA 路由總數');
+      sb.writeln('Router# show ip ospf statistics              ! 檢視 SPF 演算法執行次數與 CPU 耗時');
       sb.writeln('```');
       return;
     }
 
     if (lower.contains('vlan') || lower.contains('trunk') || lower.contains('switch')) {
       sb.writeln('```cisco');
-      sb.writeln('! === VLAN & Trunk 進階驗證與除錯 ===');
-      sb.writeln('Switch# show mac address-table dynamic vlan 10');
+      sb.writeln('! === 企業級交換器 VLAN & 802.1Q Trunk 實務配置與安全性防禦 ===');
+      sb.writeln('Switch(config)# vlan 10,20,30');
+      sb.writeln('Switch(config)# interface GigabitEthernet0/1');
+      sb.writeln('Switch(config-if)# switchport mode access');
+      sb.writeln('Switch(config-if)# switchport access vlan 10');
+      sb.writeln('Switch(config-if)# spanning-tree portfast     ! 啟用 PortFast 加速主機上線');
+      sb.writeln('Switch(config-if)# spanning-tree bpduguard enable ! 啟用 BPDU Guard 阻絕外接交換機');
+      sb.writeln('');
+      sb.writeln('! Trunk 幹線安全加固 (關閉 DTP 自動協商，修改 Native VLAN)');
+      sb.writeln('Switch(config)# interface GigabitEthernet0/24');
+      sb.writeln('Switch(config-if)# switchport mode trunk');
+      sb.writeln('Switch(config-if)# switchport nonegotiate     ! 關閉 DTP 避免中繼跳轉攻擊');
+      sb.writeln('Switch(config-if)# switchport trunk native vlan 999 ! 避免預設 VLAN 1 雙標籤跳轉');
+      sb.writeln('Switch(config-if)# switchport trunk allowed vlan 10,20,30');
+      sb.writeln('');
+      sb.writeln('! 實時檢視與除錯');
       sb.writeln('Switch# show interfaces trunk');
-      sb.writeln('Switch# show interfaces GigabitEthernet0/24 switchport');
-      sb.writeln('Switch# show dtp                              ! 檢查動態中繼協定狀態');
+      sb.writeln('Switch# show spanning-tree summary');
+      sb.writeln('Switch# show mac address-table count');
       sb.writeln('```');
       return;
     }
 
     sb.writeln('```cisco');
-    sb.writeln('! 1. 進入特權與全域設定模式');
+    sb.writeln('! === 生產環境標準化配置與監控指令 ===');
     sb.writeln('Device# configure terminal');
-    sb.writeln('! 2. 針對目標介面進行關鍵參數調整');
     sb.writeln('Device(config)# interface GigabitEthernet0/0/1');
-    sb.writeln('Device(config-if)# description === Uplink to Core ===');
+    sb.writeln('Device(config-if)# description === Production Uplink to Core DC ===');
     sb.writeln('Device(config-if)# no shutdown');
     sb.writeln('Device(config-if)# exit');
-    sb.writeln('! 3. 即時驗證指令 (Verification)');
+    sb.writeln('! 即時驗證與系統狀態審計');
     sb.writeln('Device# show running-config');
-    sb.writeln('Device# show interfaces status');
+    sb.writeln('Device# show ip interface brief');
     sb.writeln('Device# show ip route');
+    sb.writeln('Device# show logging | include ERROR|FAIL');
     sb.writeln('```');
   }
 
   static void _generateArchitectAdvice(StringBuffer sb, String lower) {
-    sb.writeln('- **設計原則**：永遠遵循「模組化 (Modularity)」、「階層化 (Hierarchical)」與「韌性設計 (Resilience)」。');
-    sb.writeln('- **故障排除技巧**：遵循 OSI 七層模型由下而上 (Bottom-Up) 排查。先確認實體層燈號 (L1)，再確認 ARP 與 MAC 表 (L2)，最後排查路由表與 Ping 測試 (L3)。');
-    sb.writeln('- **安全防禦**：落實最小權限原則，邊界設備強制啟用 CoPP (Control Plane Policing) 保護 CPU 免受阻斷服務攻擊。');
-  }
-
-  static void _generateExamTips(StringBuffer sb, String lower) {
-    sb.writeln('1. **題目關鍵字陷阱**：考題中若出現 `BEST`、`FIRST`、`MOST SECURE` 等字眼，往往所有選項皆可運行，但必須選出「最符合最佳實務」的最佳解。');
-    sb.writeln('2. **預設值記憶**：注意 Administrative Distance (AD 值)：Connected(0), Static(1), EIGRP(90), OSPF(110), eBGP(20)。');
-    sb.writeln('3. **子網路計算秒殺法**：熟記 128, 192, 224, 240, 248, 252, 254，考試時可大幅縮短作答時間！');
+    sb.writeln('1. **全域模組化架構與單點故障消除 (SPOF Elimination)**：');
+    sb.writeln('   - 採用 Core / Aggregation / Access 三層或 Spine-Leaf 現代扁平化拓撲架構，確保任意單一節點或線路中斷皆能在 50 毫秒內由 BFD/ECMP 自動切換。');
+    sb.writeln('2. **控制平面防護 (Control Plane Policing, CoPP)**：');
+    sb.writeln('   - 在所有邊界節點部署 QoS 限速規則，嚴格限制抵達 CPU 的 OSPF/BGP/SSH/ICMP 封包速率，防止分散式拒絕服務攻擊 (DDoS) 癱瘓網路控制平面。');
+    sb.writeln('3. **可觀測性與主動遙測 (Observability & Telemetry)**：');
+    sb.writeln('   - 捨棄傳統低頻率 SNMP 輪詢，改採基於 gRPC 的串流遙測 (Model-driven Streaming Telemetry) 實現網路延遲、抖動與丢包的秒級實時告警與根因分析。');
   }
 }
