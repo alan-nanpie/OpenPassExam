@@ -9,6 +9,7 @@ import '../data/models/rag_knowledge_chunk.dart';
 import 'remote_config_service.dart';
 import 'offline_model_manager.dart';
 import 'ai_offline_reasoning_engine.dart';
+import 'ai_debug_log_service.dart';
 
 enum AiPersona {
   friendlyTutor, // 該技術領域首席顧問與頂尖技術專家 (全方位詳細解析)
@@ -162,12 +163,29 @@ class AiService {
       ...keyPool,
     }.toList();
 
+    AiDebugLogService.instance.info(
+      'AiService',
+      '進入雲端推論排程，金鑰池共 ${candidateKeys.length} 組金鑰',
+      {
+        'primaryModel': config.primaryModel,
+        'fallbackModel': config.fallbackModel,
+        'thinkingLevel': config.thinkingLevel,
+        'keyCount': candidateKeys.length,
+      },
+    );
+
     var quotaExhaustedCount = 0;
     var invalidKeyCount = 0;
     String? lastFailureReason;
 
     for (var i = 0; i < candidateKeys.length; i++) {
       final currentKey = candidateKeys[i];
+      final maskedKey = currentKey.length > 8
+          ? '${currentKey.substring(0, 4)}...${currentKey.substring(currentKey.length - 4)}'
+          : '***';
+
+      AiDebugLogService.instance.info('AiService', '開始以金鑰 #${i + 1} ($maskedKey) 呼叫主推論模型 [${config.primaryModel}]');
+
       try {
         final cloudResponse = await _callGeminiMultimodalApi(
           modelName: config.primaryModel, // gemini-3.8-flash
@@ -192,14 +210,38 @@ class AiService {
         }
         lastFailureReason = errStr;
 
+        AiDebugLogService.instance.warn(
+          'AiService',
+          '金鑰 #${i + 1} ($maskedKey) 呼叫失敗: $errStr',
+          {
+            'hasMoreKeys': i < candidateKeys.length - 1,
+            'keyIndex': i + 1,
+          },
+        );
+
         // 若還有下一把備用金鑰，自動輪替並繼續重試
         if (i < candidateKeys.length - 1) {
+          AiDebugLogService.instance.info('AiService', '自動切換至金鑰池下一把金鑰 #${i + 2}');
           continue;
         }
 
         // 當所有金鑰皆嘗試過 primaryModel 失敗時，嘗試以備用穩定模型 (gemini-2.5-flash) 輪替重試
+        AiDebugLogService.instance.warn(
+          'AiService',
+          '所有金鑰皆已嘗試主推論清單，啟動備用穩定模型 [${config.fallbackModel}] 輪替排程',
+        );
+
         for (var j = 0; j < candidateKeys.length; j++) {
           final fallbackKey = candidateKeys[j];
+          final maskedFallbackKey = fallbackKey.length > 8
+              ? '${fallbackKey.substring(0, 4)}...${fallbackKey.substring(fallbackKey.length - 4)}'
+              : '***';
+
+          AiDebugLogService.instance.info(
+            'AiService',
+            '嘗試以備用金鑰 #${j + 1} ($maskedFallbackKey) 呼叫備用模型 [${config.fallbackModel}]',
+          );
+
           try {
             final fallbackResponse = await _callGeminiMultimodalApi(
               modelName: config.fallbackModel, // 預設 gemini-2.5-flash
@@ -222,6 +264,10 @@ class AiService {
               quotaExhaustedCount++;
             }
             lastFailureReason = errStr2;
+            AiDebugLogService.instance.warn(
+              'AiService',
+              '備用金鑰 #${j + 1} 備用模型呼叫失敗: $errStr2',
+            );
           }
         }
       }
@@ -276,17 +322,21 @@ class AiService {
   }) async {
     final cleanApiKey = apiKey.trim().replaceAll('"', '').replaceAll("'", '');
 
-    // 支援官方 API 模型降級清單
-    // 嚴格鎖定最新 gemini-3.8-flash 與穩定備用 gemini-2.5-flash，不含已下線的 1.5
     final candidateModels = <String>{
       modelName,
       'gemini-3.8-flash',
+      'gemini-3.7-flash',
       'gemini-2.5-flash',
     }.toList();
 
     Exception? lastException;
+    final maskedKey = cleanApiKey.length > 8
+        ? '${cleanApiKey.substring(0, 4)}...${cleanApiKey.substring(cleanApiKey.length - 4)}'
+        : '***';
 
-    for (final targetModel in candidateModels) {
+    for (var mIdx = 0; mIdx < candidateModels.length; mIdx++) {
+      final targetModel = candidateModels[mIdx];
+      final stopwatch = Stopwatch()..start();
       try {
         final url = Uri.parse(
           'https://generativelanguage.googleapis.com/v1beta/models/$targetModel:generateContent?key=$cleanApiKey',
@@ -310,9 +360,9 @@ class AiService {
         };
 
         if (isGemini3Family) {
-          // Gemini 3.8 Flash 官方規範：
+          // Gemini 3.x Flash 規範：
           // 1. 移除 temperature, top_p, top_k, frequency_penalty, presence_penalty, candidate_count
-          // 2. thinkingConfig 採用 thinkingLevel 列舉 (LOW, MEDIUM, HIGH)，嚴格禁止 MINIMAL
+          // 2. thinkingConfig 採用 thinkingLevel 列舉 (LOW, MEDIUM, HIGH)，禁止 MINIMAL
           final level = config.thinkingLevel.toUpperCase();
           final validLevel = (level == 'LOW' || level == 'HIGH') ? level : 'MEDIUM';
           generationConfig['thinkingConfig'] = {
@@ -328,7 +378,7 @@ class AiService {
           }
         }
 
-        final body = jsonEncode({
+        final bodyMap = {
           'contents': [
             {
               'role': 'user',
@@ -339,13 +389,28 @@ class AiService {
             'parts': [{'text': systemInstruction}]
           },
           'generationConfig': generationConfig,
-        });
+        };
+        final body = jsonEncode(bodyMap);
+
+        AiDebugLogService.instance.info(
+          'GeminiApi',
+          '發送請求至模型 [$targetModel] (金鑰: $maskedKey)',
+          {
+            'model': targetModel,
+            'endpoint': 'https://generativelanguage.googleapis.com/v1beta/models/$targetModel:generateContent',
+            'generationConfig': generationConfig,
+            'promptLength': prompt.length,
+            'hasQuestionContext': question != null,
+          },
+        );
 
         final response = await http.post(
           url,
           headers: {'Content-Type': 'application/json'},
           body: body,
         ).timeout(const Duration(seconds: 30));
+
+        stopwatch.stop();
 
         if (response.statusCode == 200) {
           final json = jsonDecode(response.body);
@@ -354,12 +419,45 @@ class AiService {
             final parts = candidates[0]['content']?['parts'] as List?;
             if (parts != null && parts.isNotEmpty) {
               final text = parts.map((p) => p['text'] ?? '').join('\n');
+              AiDebugLogService.instance.success(
+                'GeminiApi',
+                '模型 [$targetModel] 成功回傳 (耗時: ${stopwatch.elapsedMilliseconds}ms)',
+                {
+                  'model': targetModel,
+                  'statusCode': 200,
+                  'responseTokensEstimate': text.length,
+                  'durationMs': stopwatch.elapsedMilliseconds,
+                },
+              );
               return (text: text, modelUsed: targetModel);
             }
           }
         }
-        lastException = Exception('Gemini API Error ($targetModel): ${response.statusCode} - ${response.body}');
+
+        final errDetail = 'HTTP ${response.statusCode}: ${response.body}';
+        AiDebugLogService.instance.warn(
+          'GeminiApi',
+          '模型 [$targetModel] 呼叫未成功 (狀態碼: ${response.statusCode}, 耗時: ${stopwatch.elapsedMilliseconds}ms)',
+          {
+            'model': targetModel,
+            'statusCode': response.statusCode,
+            'responseBody': response.body,
+            'nextCandidate': mIdx < candidateModels.length - 1 ? candidateModels[mIdx + 1] : '無',
+          },
+        );
+        lastException = Exception('Gemini API Error ($targetModel): $errDetail');
       } catch (e) {
+        stopwatch.stop();
+        AiDebugLogService.instance.error(
+          'GeminiApi',
+          '模型 [$targetModel] 發送異常: $e',
+          {
+            'model': targetModel,
+            'exception': e.toString(),
+            'durationMs': stopwatch.elapsedMilliseconds,
+            'nextCandidate': mIdx < candidateModels.length - 1 ? candidateModels[mIdx + 1] : '無',
+          },
+        );
         lastException = Exception('Gemini API Exception ($targetModel): $e');
       }
     }
@@ -419,37 +517,74 @@ class AiService {
   Future<String?> testGeminiApiKey(String apiKey) async {
     final cleanKey = apiKey.trim().replaceAll('"', '').replaceAll("'", '');
     if (cleanKey.isEmpty) return 'API Key 不能為空';
-    try {
-      final url = Uri.parse(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=$cleanKey',
-      );
-      final body = jsonEncode({
-        'contents': [
-          {
-            'role': 'user',
-            'parts': [{'text': 'ping'}]
-          }
-        ],
-      });
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: body,
-      ).timeout(const Duration(seconds: 8));
+    
+    final probeModels = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-2.5-flash'];
+    final maskedKey = cleanKey.length > 8
+        ? '${cleanKey.substring(0, 4)}...${cleanKey.substring(cleanKey.length - 4)}'
+        : '***';
 
-      if (response.statusCode == 200) {
-        return null; // 成功無錯誤
-      }
+    String? lastError;
+
+    for (final model in probeModels) {
       try {
-        final json = jsonDecode(response.body);
-        final msg = json['error']?['message'] ?? 'HTTP ${response.statusCode}';
-        return msg.toString();
-      } catch (_) {
-        return 'HTTP ${response.statusCode}：${response.body}';
+        final url = Uri.parse(
+          'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$cleanKey',
+        );
+        final body = jsonEncode({
+          'contents': [
+            {
+              'role': 'user',
+              'parts': [{'text': 'ping'}]
+            }
+          ],
+        });
+        final response = await http.post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: body,
+        ).timeout(const Duration(seconds: 8));
+
+        if (response.statusCode == 200) {
+          AiDebugLogService.instance.success(
+            'ApiKeyTest',
+            '金鑰 ($maskedKey) 測試通過 (驗證模型: $model)',
+            {'model': model, 'statusCode': 200},
+          );
+          return null; // 成功無錯誤
+        }
+
+        try {
+          final json = jsonDecode(response.body);
+          final msg = json['error']?['message'] ?? 'HTTP ${response.statusCode}';
+          lastError = msg.toString();
+        } catch (_) {
+          lastError = 'HTTP ${response.statusCode}：${response.body}';
+        }
+
+        AiDebugLogService.instance.warn(
+          'ApiKeyTest',
+          '金鑰 ($maskedKey) 探測模型 [$model] 回應非 200: $lastError',
+          {'model': model, 'statusCode': response.statusCode},
+        );
+
+        // 如果是 404 (模型名稱不支援)，繼續探測下一個模型
+        if (response.statusCode == 404) {
+          continue;
+        }
+
+        // 若是 400 API key invalid 或 429 quota exhausted，則直接回報
+        return lastError;
+      } catch (e) {
+        lastError = e.toString();
+        AiDebugLogService.instance.error(
+          'ApiKeyTest',
+          '金鑰 ($maskedKey) 探測模型 [$model] 發生異常: $e',
+          {'model': model, 'exception': e.toString()},
+        );
       }
-    } catch (e) {
-      return e.toString();
     }
+
+    return lastError;
   }
 
   String _generateSimulatedHighQualityResponse({

@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../data/models/question.dart';
 import '../data/repositories/rag_repository.dart';
 import '../services/ai_service.dart';
+import '../services/ai_debug_log_service.dart';
 
 class ChatMessage {
   final String id;
@@ -229,8 +230,24 @@ class AiTutorController extends ChangeNotifier {
       }
     }
 
+    sb.writeln('## 🛠️ 內部推論除錯日誌 (Debug Log 摘要)');
+    sb.writeln('```text');
+    sb.writeln(AiDebugLogService.instance.exportAllLogsAsText());
+    sb.writeln('```\n');
+
     sb.writeln('*由 OpenPassExam AI 助教匯出系統自動產出*');
     return sb.toString();
+  }
+
+  /// 匯出純除錯日誌文字
+  String exportDebugLogs() {
+    return AiDebugLogService.instance.exportAllLogsAsText();
+  }
+
+  /// 清空除錯日誌
+  void clearDebugLogs() {
+    AiDebugLogService.instance.clear();
+    notifyListeners();
   }
 }
 

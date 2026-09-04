@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../controllers/ai_tutor_controller.dart';
 import '../../services/offline_model_manager.dart';
+import '../../services/ai_debug_log_service.dart';
 import '../../core/utils/file_exporter.dart';
 import 'persona_selector_widget.dart';
 
@@ -83,6 +85,11 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
             icon: const Icon(Icons.file_download_outlined),
             tooltip: '匯出全部對話為 Markdown (西元年月日時分秒.md)',
             onPressed: () => _exportAllMessagesToMarkdown(context, aiCtrl),
+          ),
+          IconButton(
+            icon: const Icon(Icons.bug_report_outlined),
+            tooltip: '查看與匯出內部除錯日誌 (Debug Log)',
+            onPressed: () => _showDebugLogDialog(context, aiCtrl),
           ),
           IconButton(
             icon: const Icon(Icons.info_outline),
@@ -728,6 +735,148 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showDebugLogDialog(BuildContext context, AiTutorController aiCtrl) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) {
+          final logEntries = AiDebugLogService.instance.logs;
+
+          return AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.bug_report, color: AppColors.primary),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text('AI 內部推論除錯日誌 (Debug Log)', style: TextStyle(fontSize: 16)),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh, size: 20),
+                  tooltip: '重新整理',
+                  onPressed: () => setDialogState(() {}),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                  tooltip: '清空除錯日誌',
+                  onPressed: () {
+                    aiCtrl.clearDebugLogs();
+                    setDialogState(() {});
+                  },
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 650,
+              height: 480,
+              child: logEntries.isEmpty
+                  ? const Center(
+                      child: Text(
+                        '目前尚無任何推論日誌。\n請先向 AI 助教發送提問或測試 API Key 後再次檢視。',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    )
+                  : ListView.separated(
+                      itemCount: logEntries.length,
+                      separatorBuilder: (_, _) => const Divider(height: 1),
+                      itemBuilder: (itemCtx, index) {
+                        final entry = logEntries[index];
+                        Color badgeColor = Colors.grey;
+                        if (entry.level == 'SUCCESS') badgeColor = Colors.green;
+                        if (entry.level == 'WARN') badgeColor = Colors.orange;
+                        if (entry.level == 'ERROR') badgeColor = Colors.red;
+                        if (entry.level == 'INFO') badgeColor = Colors.blue;
+
+                        return ExpansionTile(
+                          dense: true,
+                          leading: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: badgeColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: badgeColor, width: 0.8),
+                            ),
+                            child: Text(
+                              entry.level,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: badgeColor,
+                              ),
+                            ),
+                          ),
+                          title: Text(
+                            entry.message,
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                          subtitle: Text(
+                            '${entry.tag} • ${entry.timestamp.toString().substring(11, 19)}',
+                            style: const TextStyle(fontSize: 10.5, color: Colors.grey),
+                          ),
+                          children: [
+                            if (entry.details != null && entry.details!.isNotEmpty)
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(10),
+                                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: isDark ? Colors.black38 : Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: SelectableText(
+                                  entry.details!.entries
+                                      .map((e) => '${e.key}: ${e.value}')
+                                      .join('\n'),
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+            ),
+            actions: [
+              OutlinedButton.icon(
+                icon: const Icon(Icons.copy, size: 16),
+                label: const Text('複製全部日誌'),
+                onPressed: () {
+                  final text = aiCtrl.exportDebugLogs();
+                  Clipboard.setData(ClipboardData(text: text));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('📋 已將完整 AI 除錯日誌複製至剪貼簿！')),
+                  );
+                },
+              ),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.download, size: 16),
+                label: const Text('匯出為 .txt 檔'),
+                onPressed: () async {
+                  final text = aiCtrl.exportDebugLogs();
+                  final fileName = 'debug_log_${FileExporter.generateTimestampFileName().replaceAll('.md', '.txt')}';
+                  await FileExporter.exportMarkdown(markdownContent: text, customFileName: fileName);
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('📥 已下載除錯日誌檔 ($fileName)')),
+                    );
+                  }
+                },
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('關閉'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
