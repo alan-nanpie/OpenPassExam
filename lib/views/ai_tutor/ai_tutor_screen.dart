@@ -630,12 +630,14 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
                               });
 
                               var validCount = 0;
+                              final validKeysList = <String>[];
                               final errMessages = <String>[];
                               for (var i = 0; i < keys.length; i++) {
                                 final k = keys[i];
                                 final err = await aiCtrl.testUserApiKey(k);
                                 if (err == null) {
                                   validCount++;
+                                  validKeysList.add(k);
                                 } else {
                                   final masked = k.length > 8 ? '${k.substring(0, 4)}...${k.substring(k.length - 4)}' : '金鑰 #${i + 1}';
                                   errMessages.add('$masked: $err');
@@ -659,6 +661,27 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
                           : const Icon(Icons.bolt, size: 16),
                       label: Text(isTestingKey ? '正在連線測試金鑰池...' : '⚡ 批次測試金鑰有效性'),
                     ),
+                    const SizedBox(width: 8),
+                    if (testResult != null && !isTestSuccess && textController.text.contains('\n'))
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                        icon: const Icon(Icons.cleaning_services, size: 16),
+                        label: const Text('自動剔除失效金鑰'),
+                        onPressed: () async {
+                          final raw = textController.text.trim();
+                          final keys = raw.split(RegExp(r'[\n,;]')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+                          final remaining = <String>[];
+                          for (final k in keys) {
+                            final err = await aiCtrl.testUserApiKey(k);
+                            if (err == null) remaining.add(k);
+                          }
+                          textController.text = remaining.join('\n');
+                          setState(() {
+                            testResult = '🧹 已自動清除無效金鑰！剩餘 ${remaining.length} 組有效金鑰。';
+                            isTestSuccess = remaining.isNotEmpty;
+                          });
+                        },
+                      ),
                   ],
                 ),
                 if (testResult != null) ...[

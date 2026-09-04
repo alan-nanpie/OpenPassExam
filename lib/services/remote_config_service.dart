@@ -5,8 +5,8 @@ class RemoteConfigService {
     primaryModel: 'gemini-3.8-flash',
     fallbackModel: 'gemini-2.5-flash',
     temperature: 1.0,
-    maxTokens: 4096,
-    thinkingBudget: 2048,
+    maxTokens: 16384,
+    thinkingBudget: 4096,
     thinkingLevel: 'MEDIUM',
     sourceLayer: AiConfigLayer.remoteConfig,
   );

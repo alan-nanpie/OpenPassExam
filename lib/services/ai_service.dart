@@ -37,13 +37,18 @@ class AiService {
     // 1. 本機覆寫
     final localOverride = localCache.getLocalAiConfig();
     if (localOverride != null) {
-      // 若本機覆寫中殘留舊版預設模型（如 gemini-2.5-flash / gemini-2.0-flash），自動平滑升級至 gemini-3.8-flash
-      if (localOverride.primaryModel == 'gemini-2.5-flash' || localOverride.primaryModel.contains('gemini-2.0')) {
-        final upgraded = localOverride.copyWith(primaryModel: 'gemini-3.8-flash');
-        localCache.saveLocalAiConfig(upgraded);
-        return upgraded;
+      // 若本機覆寫中殘留舊版預設模型或過小 maxTokens，自動平滑升級
+      var effective = localOverride;
+      if (effective.primaryModel == 'gemini-2.5-flash' || effective.primaryModel.contains('gemini-2.0')) {
+        effective = effective.copyWith(primaryModel: 'gemini-3.8-flash');
       }
-      return localOverride;
+      if (effective.maxTokens < 16384) {
+        effective = effective.copyWith(maxTokens: 16384, thinkingBudget: 4096);
+      }
+      if (effective != localOverride) {
+        localCache.saveLocalAiConfig(effective);
+      }
+      return effective;
     }
 
     // 2. Firebase RTDB 廣播
@@ -394,7 +399,7 @@ class AiService {
 
         AiDebugLogService.instance.info(
           'GeminiApi',
-          '發送請求至模型 [$targetModel] (金鑰: $maskedKey)',
+          '發送請求至模型 [$targetModel] (金鑰: $maskedKey, maxTokens: ${config.maxTokens})',
           {
             'model': targetModel,
             'endpoint': 'https://generativelanguage.googleapis.com/v1beta/models/$targetModel:generateContent',
@@ -404,11 +409,26 @@ class AiService {
           },
         );
 
-        final response = await http.post(
+        var response = await http.post(
           url,
           headers: {'Content-Type': 'application/json'},
           body: body,
-        ).timeout(const Duration(seconds: 30));
+        ).timeout(const Duration(seconds: 40));
+
+        // 遇到 503 (High Demand 暫時性壅塞)，若為 gemini-3.8-flash 則自動退避 1.5 秒重試一次
+        if (response.statusCode == 503 && targetModel == 'gemini-3.8-flash') {
+          AiDebugLogService.instance.warn(
+            'GeminiApi',
+            '模型 [$targetModel] 遭遇 503 暫時尖峰壅塞，進行退避 1.5 秒快速重試 (Quick Retry)...',
+            {'statusCode': 503, 'retryAfterMs': 1500},
+          );
+          await Future.delayed(const Duration(milliseconds: 1500));
+          response = await http.post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: body,
+          ).timeout(const Duration(seconds: 40));
+        }
 
         stopwatch.stop();
 
@@ -416,16 +436,19 @@ class AiService {
           final json = jsonDecode(response.body);
           final candidates = json['candidates'] as List?;
           if (candidates != null && candidates.isNotEmpty) {
-            final parts = candidates[0]['content']?['parts'] as List?;
+            final firstCand = candidates[0] as Map<String, dynamic>;
+            final finishReason = firstCand['finishReason'] as String? ?? 'NORMAL';
+            final parts = firstCand['content']?['parts'] as List?;
             if (parts != null && parts.isNotEmpty) {
               final text = parts.map((p) => p['text'] ?? '').join('\n');
               AiDebugLogService.instance.success(
                 'GeminiApi',
-                '模型 [$targetModel] 成功回傳 (耗時: ${stopwatch.elapsedMilliseconds}ms)',
+                '模型 [$targetModel] 成功回傳 (耗時: ${stopwatch.elapsedMilliseconds}ms, finishReason: $finishReason)',
                 {
                   'model': targetModel,
                   'statusCode': 200,
-                  'responseTokensEstimate': text.length,
+                  'finishReason': finishReason,
+                  'responseLength': text.length,
                   'durationMs': stopwatch.elapsedMilliseconds,
                 },
               );
@@ -435,6 +458,12 @@ class AiService {
         }
 
         final errDetail = 'HTTP ${response.statusCode}: ${response.body}';
+
+        // 若為 401/403/400 (金鑰未授權或無效)，代表整把金鑰失效，不需再換模型嘗試，直接拋出讓外層快速換下一把金鑰
+        final isAuthOrKeyError = response.statusCode == 401 ||
+            response.statusCode == 403 ||
+            (response.statusCode == 400 && response.body.contains('API_KEY_INVALID'));
+
         AiDebugLogService.instance.warn(
           'GeminiApi',
           '模型 [$targetModel] 呼叫未成功 (狀態碼: ${response.statusCode}, 耗時: ${stopwatch.elapsedMilliseconds}ms)',
@@ -442,23 +471,36 @@ class AiService {
             'model': targetModel,
             'statusCode': response.statusCode,
             'responseBody': response.body,
-            'nextCandidate': mIdx < candidateModels.length - 1 ? candidateModels[mIdx + 1] : '無',
+            'action': isAuthOrKeyError ? '金鑰無效，立即跳至下一把金鑰' : (mIdx < candidateModels.length - 1 ? '切換下一候選模型: ${candidateModels[mIdx + 1]}' : '無下一模型'),
           },
         );
+
         lastException = Exception('Gemini API Error ($targetModel): $errDetail');
+        if (isAuthOrKeyError) {
+          throw lastException;
+        }
       } catch (e) {
         stopwatch.stop();
+        final errStr = e.toString();
+        final isAuthOrKeyError = errStr.contains('401') ||
+            errStr.contains('403') ||
+            errStr.contains('API_KEY_INVALID') ||
+            errStr.contains('ACCESS_TOKEN_TYPE_UNSUPPORTED');
+
         AiDebugLogService.instance.error(
           'GeminiApi',
           '模型 [$targetModel] 發送異常: $e',
           {
             'model': targetModel,
-            'exception': e.toString(),
+            'exception': errStr,
             'durationMs': stopwatch.elapsedMilliseconds,
-            'nextCandidate': mIdx < candidateModels.length - 1 ? candidateModels[mIdx + 1] : '無',
+            'action': isAuthOrKeyError ? '金鑰無效，立即中斷當前金鑰' : (mIdx < candidateModels.length - 1 ? '切換下一候選模型: ${candidateModels[mIdx + 1]}' : '無下一模型'),
           },
         );
         lastException = Exception('Gemini API Exception ($targetModel): $e');
+        if (isAuthOrKeyError) {
+          throw lastException;
+        }
       }
     }
 
