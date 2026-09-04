@@ -128,12 +128,12 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
                                 ? '📥 正在下載端側模型 (${(offlineMgr.downloadProgress * 100).toInt()}%)'
                                 : (isOfflinePreferred
                                     ? (isReady ? '⚡ 模式：端側離線推論 (Gemma 4 2B 已就緒)' : '⚡ 模式：端側離線 (尚未下載完整模型)')
-                                    : (aiCtrl.hasUserApiKey ? '☁️ 模式：Google 雲端 Gemini 旗艦推論 (gemini-2.5-flash)' : '⚠️ 雲端模式：尚未設定 API Key → 點此設定')),
+                                    : (aiCtrl.hasUserApiKey ? '☁️ 模式：Google 雲端 Gemini 旗艦推論 (gemini-3.8-flash)' : '⚠️ 雲端模式：尚未設定 API Key → 點此設定')),
                             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                             overflow: TextOverflow.ellipsis,
                           ),
                           Text(
-                            isOfflinePreferred ? '0 延遲 • 零網路流量消耗 • 100% 隱私' : '高深度 Dynamic Thinking 思考架構',
+                            isOfflinePreferred ? '0 延遲 • 零網路流量消耗 • 100% 隱私' : 'Gemini 3.8 智慧推理思考架構',
                             style: TextStyle(
                               fontSize: 10,
                               color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
@@ -236,7 +236,7 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    'Gemini 3.7 Dynamic Thinking 思考推理中...',
+                    'Gemini 3.8 Flash 智慧推理中...',
                     style: TextStyle(
                       fontSize: 12,
                       color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
@@ -498,12 +498,12 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                '1. 雲端旗艦：Google Gemini 3.7 Flash',
+                '1. 雲端旗艦：Google Gemini 3.8 Flash',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               ),
               SizedBox(height: 4),
               Text(
-                '具備 Dynamic Thinking 思考深度，能根據網路題目難度動態分配推理運算，輸出生活化比喻與手把手 Cisco CLI 實戰教學。',
+                '具備自適應 Thinking Level (MEDIUM/HIGH) 智慧思考深度，能根據網路題目難度動態分配推理運算，輸出生活化比喻與手把手 Cisco CLI 實戰教學。',
                 style: TextStyle(fontSize: 12.5),
               ),
               SizedBox(height: 12),
@@ -530,7 +530,10 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
   }
 
   void _showApiKeyDialog(BuildContext context, AiTutorController aiCtrl) {
-    final textController = TextEditingController(text: aiCtrl.userGeminiApiKey ?? '');
+    final existingKeys = aiCtrl.userGeminiApiKeys;
+    final textController = TextEditingController(
+      text: existingKeys.isNotEmpty ? existingKeys.join('\n') : '',
+    );
     var isObscured = true;
     var isTestingKey = false;
     String? testResult;
@@ -544,7 +547,7 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
             children: [
               Icon(Icons.key, color: AppColors.primary),
               SizedBox(width: 8),
-              Text('Gemini API Key 設定 (BYOK)'),
+              Text('Gemini API Key 金鑰池設定 (BYOK)'),
             ],
           ),
           content: SingleChildScrollView(
@@ -553,10 +556,11 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  '💡 **自備免費金鑰機制 (BYOK)**：\n'
-                  '為保障您的隱私與專屬獨立配額，您可以免費向 Google 官方申請個人專屬的 Gemini 3.7 Flash API Key。\n\n'
-                  '• **100% 免費**：Google AI Studio 提供充裕免費額度，免綁信用卡。\n'
-                  '• **極致安全**：金鑰僅保存在本機裝置（瀏覽器/手機快取），絕不上傳任何伺服器。',
+                  '💡 **自備免費金鑰池機制 (BYOK & Failover)**：\n'
+                  '為保障您的專屬獨立配額，您可以向 Google 官方免費申請一至多組個人專屬的 Gemini 3.8 Flash API Key。\n\n'
+                  '• **支援最新金鑰格式**：完全支援新版 `AQ.Ab8RN6J...` 與經典 `AIzaSy...` 格式。\n'
+                  '• **多組金鑰智慧輪替**：可輸入多組金鑰（一行一把），遇到每日免費額度耗盡 (429) 或異常時，系統會**自動切換至下一組金鑰**！\n'
+                  '• **極致安全**：金鑰僅存於您的本機裝置（瀏覽器快取），絕不上傳任何伺服器。',
                   style: TextStyle(fontSize: 12.5, height: 1.45),
                 ),
                 const SizedBox(height: 14),
@@ -580,12 +584,14 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
                 TextField(
                   controller: textController,
                   obscureText: isObscured,
+                  maxLines: isObscured ? 1 : 5,
                   decoration: InputDecoration(
-                    labelText: '輸入您的 Gemini API Key (AIzaSy...)',
-                    hintText: 'AIzaSy...',
+                    labelText: '輸入 Gemini API Key（多組請以換行隔開）',
+                    hintText: "AQ.Ab8RN6J...\n或 AIzaSy...",
                     border: const OutlineInputBorder(),
                     suffixIcon: IconButton(
                       icon: Icon(isObscured ? Icons.visibility_off : Icons.visibility),
+                      tooltip: isObscured ? '顯示全部金鑰' : '隱藏金鑰',
                       onPressed: () => setState(() => isObscured = !isObscured),
                     ),
                   ),
@@ -598,10 +604,15 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
                       onPressed: isTestingKey
                           ? null
                           : () async {
-                              final inputKey = textController.text.trim();
-                              if (inputKey.isEmpty) {
+                              final raw = textController.text.trim();
+                              final keys = raw
+                                  .split(RegExp(r'[\n,;]'))
+                                  .map((s) => s.trim())
+                                  .where((s) => s.isNotEmpty)
+                                  .toList();
+                              if (keys.isEmpty) {
                                 setState(() {
-                                  testResult = '請先輸入 API Key 後再點擊測試！';
+                                  testResult = '請先輸入至少一組 API Key 後再點擊測試！';
                                   isTestSuccess = false;
                                 });
                                 return;
@@ -610,25 +621,43 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
                                 isTestingKey = true;
                                 testResult = null;
                               });
-                              final err = await aiCtrl.testUserApiKey(inputKey);
+
+                              var validCount = 0;
+                              final errMessages = <String>[];
+                              for (var i = 0; i < keys.length; i++) {
+                                final k = keys[i];
+                                final err = await aiCtrl.testUserApiKey(k);
+                                if (err == null) {
+                                  validCount++;
+                                } else {
+                                  final masked = k.length > 8 ? '${k.substring(0, 4)}...${k.substring(k.length - 4)}' : '金鑰 #${i + 1}';
+                                  errMessages.add('$masked: $err');
+                                }
+                              }
+
                               setState(() {
                                 isTestingKey = false;
-                                isTestSuccess = err == null;
-                                testResult = err == null
-                                    ? '✅ Google 雲端 API 連線成功！金鑰有效可用。'
-                                    : '❌ 驗證失敗：$err';
+                                isTestSuccess = validCount > 0;
+                                if (validCount == keys.length) {
+                                  testResult = '✅ 全部 ${keys.length} 組 Google Gemini API Key 連線測試成功！均有效可用。';
+                                } else if (validCount > 0) {
+                                  testResult = '⚠️ 共 $validCount / ${keys.length} 組金鑰有效可用。\n失敗項目：\n${errMessages.join("\n")}';
+                                } else {
+                                  testResult = '❌ 所有金鑰驗證失敗：\n${errMessages.join("\n")}';
+                                }
                               });
                             },
                       icon: isTestingKey
                           ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
                           : const Icon(Icons.bolt, size: 16),
-                      label: Text(isTestingKey ? '正在連線測試...' : '⚡ 測試金鑰有效性'),
+                      label: Text(isTestingKey ? '正在連線測試金鑰池...' : '⚡ 批次測試金鑰有效性'),
                     ),
                   ],
                 ),
                 if (testResult != null) ...[
                   const SizedBox(height: 8),
                   Container(
+                    width: double.infinity,
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: isTestSuccess
@@ -661,11 +690,11 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
                   if (ctx.mounted) {
                     Navigator.of(ctx).pop();
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('已清除個人 Gemini API Key，切換為離線端側模式')),
+                      const SnackBar(content: Text('已清除所有個人 Gemini API Key，切換為離線端側模式')),
                     );
                   }
                 },
-                child: const Text('清除金鑰', style: TextStyle(color: Colors.red)),
+                child: const Text('清除全部金鑰', style: TextStyle(color: Colors.red)),
               ),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
@@ -673,23 +702,29 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
             ),
             FilledButton(
               onPressed: () async {
-                final key = textController.text.trim();
-                if (key.isNotEmpty) {
-                  await aiCtrl.saveUserApiKey(key);
+                final raw = textController.text.trim();
+                final keys = raw
+                    .split(RegExp(r'[\n,;]'))
+                    .map((s) => s.trim())
+                    .where((s) => s.isNotEmpty)
+                    .toList();
+                if (keys.isNotEmpty) {
+                  await aiCtrl.saveUserApiKeys(keys);
                   if (ctx.mounted) {
                     Navigator.of(ctx).pop();
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('✅ 已成功儲存個人 Gemini API Key！')),
+                      SnackBar(content: Text('✅ 已成功儲存 ${keys.length} 組個人 Gemini API Key 金鑰池！')),
                     );
                   }
                 } else {
-                  await aiCtrl.clearUserApiKey();
                   if (ctx.mounted) {
-                    Navigator.of(ctx).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('請先輸入至少一組有效的 Gemini API Key')),
+                    );
                   }
                 }
               },
-              child: const Text('儲存設定'),
+              child: const Text('儲存金鑰池'),
             ),
           ],
         ),

@@ -154,70 +154,115 @@ class AiService {
       return (text: text, modelUsed: 'Gemma 4 (2B) 離線', failureReason: null);
     }
 
-    // === 【第 2 優先】：雲端 Google 最新 AI 多模態模型 ===
-    try {
-      final cloudResponse = await _callGeminiMultimodalApi(
-        modelName: config.primaryModel, // 例如 gemini-3.8-flash 或 gemini-2.5-flash
-        prompt: prompt,
-        apiKey: (apiKey ?? '').trim(),
-        config: config,
-        question: questionContext,
-        ragChunks: ragChunks,
-        persona: persona,
-      );
-      return (
-        text: filterThinkingOutput(cloudResponse.text),
-        modelUsed: cloudResponse.modelUsed,
-        failureReason: null,
-      );
-    } catch (e) {
-      // === 【第 3 優先 (備用)】：主流且最穩定多模態模型 (Gemini 2.5 Flash) ===
+    // === 【第 2 優先】：雲端 Google 最新 AI 多模態模型 (支援金鑰池自動輪替 Failover) ===
+    // 取得所有可用金鑰清單
+    final keyPool = localCache.getUserGeminiApiKeys();
+    final candidateKeys = <String>{
+      if (apiKey != null && apiKey.trim().isNotEmpty) apiKey.trim(),
+      ...keyPool,
+    }.toList();
+
+    var quotaExhaustedCount = 0;
+    var invalidKeyCount = 0;
+    String? lastFailureReason;
+
+    for (var i = 0; i < candidateKeys.length; i++) {
+      final currentKey = candidateKeys[i];
       try {
-        final fallbackResponse = await _callGeminiMultimodalApi(
-          modelName: config.fallbackModel, // 預設 gemini-2.5-flash
+        final cloudResponse = await _callGeminiMultimodalApi(
+          modelName: config.primaryModel, // gemini-3.8-flash
           prompt: prompt,
-          apiKey: (apiKey ?? '').trim(),
+          apiKey: currentKey,
           config: config,
           question: questionContext,
           ragChunks: ragChunks,
           persona: persona,
         );
-        final cleanFallback = filterThinkingOutput(fallbackResponse.text);
         return (
-          text: '🛡️ **[已自動調度備用穩定模型：${fallbackResponse.modelUsed}]**\n\n$cleanFallback',
-          modelUsed: fallbackResponse.modelUsed,
+          text: filterThinkingOutput(cloudResponse.text),
+          modelUsed: cloudResponse.modelUsed,
           failureReason: null,
         );
-      } catch (e2) {
-        // 雙雲端模型均連線失敗時，由本地智能推理引擎無縫接管，確保百分之百針對問題回答
-        final localAnswer = _generateSimulatedHighQualityResponse(
-          prompt: prompt,
-          question: questionContext,
-          ragChunks: ragChunks,
-          persona: persona,
-          config: config,
-        );
+      } catch (e) {
+        final errStr = e.toString();
+        if (errStr.contains('RESOURCE_EXHAUSTED') || errStr.contains('429')) {
+          quotaExhaustedCount++;
+        } else if (errStr.contains('API_KEY_INVALID') || errStr.contains('API key not valid')) {
+          invalidKeyCount++;
+        }
+        lastFailureReason = errStr;
 
-        String errorDiagnosis;
-        final errStr = e2.toString();
-        if (errStr.contains('API_KEY_INVALID') || errStr.contains('API key not valid')) {
-          errorDiagnosis = '您設定的 Google Gemini API Key 無效或尚未啟用。請點擊右上角金鑰圖示 🔑，至 [Google AI Studio](https://aistudio.google.com/) 免費重新建立並複製正確的金鑰。';
-        } else if (errStr.contains('PERMISSION_DENIED')) {
-          errorDiagnosis = '該 API Key 缺乏 Generative Language API 存取權限。';
-        } else if (errStr.contains('RESOURCE_EXHAUSTED')) {
-          errorDiagnosis = '該 Gemini API Key 今日配額已耗盡，請稍候重試或更換金鑰。';
-        } else if (errStr.contains('XMLHttpRequest') || errStr.contains('ClientException')) {
-          errorDiagnosis = '瀏覽器發送網路請求失敗（可能是網路連線不穩或受廣告攔截插件阻擋）。';
-        } else if (errStr.contains('TimeoutException')) {
-          errorDiagnosis = 'Google 雲端 API 伺服器連線逾時 (超過 15 秒)。';
-        } else {
-          errorDiagnosis = errStr;
+        // 若還有下一把備用金鑰，自動輪替並繼續重試
+        if (i < candidateKeys.length - 1) {
+          continue;
         }
 
-        final text = '⚠️ **[雲端 API 連線異常提示]**\n> 🔍 **診斷原因**：$errorDiagnosis\n> 🛡️ **已自動由本機端側智能引擎接管推論**\n\n$localAnswer';
-        return (text: text, modelUsed: 'Gemma 4 (2B) 接管', failureReason: errorDiagnosis);
+        // 當所有金鑰皆嘗試過 primaryModel 失敗時，嘗試以備用穩定模型 (gemini-2.5-flash) 輪替重試
+        for (var j = 0; j < candidateKeys.length; j++) {
+          final fallbackKey = candidateKeys[j];
+          try {
+            final fallbackResponse = await _callGeminiMultimodalApi(
+              modelName: config.fallbackModel, // 預設 gemini-2.5-flash
+              prompt: prompt,
+              apiKey: fallbackKey,
+              config: config,
+              question: questionContext,
+              ragChunks: ragChunks,
+              persona: persona,
+            );
+            final cleanFallback = filterThinkingOutput(fallbackResponse.text);
+            return (
+              text: '🛡️ **[已自動調度備用穩定模型：${fallbackResponse.modelUsed}]**\n\n$cleanFallback',
+              modelUsed: fallbackResponse.modelUsed,
+              failureReason: null,
+            );
+          } catch (e2) {
+            final errStr2 = e2.toString();
+            if (errStr2.contains('RESOURCE_EXHAUSTED') || errStr2.contains('429')) {
+              quotaExhaustedCount++;
+            }
+            lastFailureReason = errStr2;
+          }
+        }
       }
     }
+
+    // 雙雲端模型與所有金鑰池均連線失敗時，由本地智能推理引擎無縫接管
+    final localAnswer = _generateSimulatedHighQualityResponse(
+      prompt: prompt,
+      question: questionContext,
+      ragChunks: ragChunks,
+      persona: persona,
+      config: config,
+    );
+
+    String errorDiagnosis;
+    final totalKeys = candidateKeys.length;
+    if (totalKeys > 0 && quotaExhaustedCount >= totalKeys) {
+      errorDiagnosis = '⚠️ **您所設定的 $totalKeys 組 Gemini API Key 今日免費額度皆已全數耗盡 (429 RESOURCE_EXHAUSTED)**。\n'
+          '> 建議：請至 [Google AI Studio](https://aistudio.google.com/app/apikey) 免費建立新金鑰並加入金鑰池，或等待 Google 每日配額重設。';
+    } else if (totalKeys > 0 && invalidKeyCount >= totalKeys) {
+      errorDiagnosis = '您設定的 $totalKeys 組 Google Gemini API Key 皆無效或尚未啟用。請至 [Google AI Studio](https://aistudio.google.com/app/apikey) 免費重新建立正確的金鑰 (支援 AQ... 與 AIzaSy... 格式)。';
+    } else if (lastFailureReason != null) {
+      if (lastFailureReason.contains('API_KEY_INVALID') || lastFailureReason.contains('API key not valid')) {
+        errorDiagnosis = '您設定的 Google Gemini API Key 無效或尚未啟用。請點擊右上角金鑰圖示 🔑，至 [Google AI Studio](https://aistudio.google.com/app/apikey) 免費建立正確金鑰。';
+      } else if (lastFailureReason.contains('RESOURCE_EXHAUSTED') || lastFailureReason.contains('429')) {
+        errorDiagnosis = 'Gemini API Key 免費配額已耗盡 (429 RESOURCE_EXHAUSTED)。請更換或新增金鑰。';
+      } else if (lastFailureReason.contains('PERMISSION_DENIED')) {
+        errorDiagnosis = '該 API Key 缺乏 Generative Language API 存取權限。';
+      } else if (lastFailureReason.contains('XMLHttpRequest') || lastFailureReason.contains('ClientException')) {
+        errorDiagnosis = '瀏覽器發送網路請求失敗（可能是網路連線不穩或受廣告攔截插件阻擋）。';
+      } else if (lastFailureReason.contains('TimeoutException')) {
+        errorDiagnosis = 'Google 雲端 API 伺服器連線逾時 (超過 15 秒)。';
+      } else {
+        errorDiagnosis = lastFailureReason;
+      }
+    } else {
+      errorDiagnosis = 'Google 雲端 API 連線中斷';
+    }
+
+    final text = '⚠️ **[雲端 API 連線異常提示]**\n> 🔍 **診斷原因**：$errorDiagnosis\n> 🛡️ **已自動由本機端側智能引擎接管推論**\n\n$localAnswer';
+    return (text: text, modelUsed: 'Gemma 4 (2B) 接管', failureReason: errorDiagnosis);
   }
 
   Future<({String text, String modelUsed})> _callGeminiMultimodalApi({
@@ -232,12 +277,11 @@ class AiService {
     final cleanApiKey = apiKey.trim().replaceAll('"', '').replaceAll("'", '');
 
     // 支援官方 API 模型降級清單
-    // 優先調度 gemini-3.8-flash，若遇故障依序回退
+    // 嚴格鎖定最新 gemini-3.8-flash 與穩定備用 gemini-2.5-flash，不含已下線的 1.5
     final candidateModels = <String>{
       modelName,
       'gemini-3.8-flash',
       'gemini-2.5-flash',
-      'gemini-1.5-flash',
     }.toList();
 
     Exception? lastException;

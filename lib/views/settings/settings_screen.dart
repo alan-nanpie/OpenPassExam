@@ -122,11 +122,11 @@ class SettingsScreen extends StatelessWidget {
                     hasKey ? Icons.key : Icons.key_off_outlined,
                     color: hasKey ? Colors.green : AppColors.warning,
                   ),
-                  title: Text(hasKey ? 'Gemini 3.8 Flash API Key：已設定' : 'Gemini 3.8 Flash API Key：尚未設定'),
+                  title: Text(hasKey ? 'Gemini 3.8 Flash API Key：已設定 (${aiCtrl.userGeminiApiKeys.length} 組金鑰池)' : 'Gemini 3.8 Flash API Key：尚未設定'),
                   subtitle: Text(
                     hasKey
-                        ? '已綁定專屬金鑰，離線推論以外之進階多模態題目將自動調度 Gemini 3.8 Flash！'
-                        : '點此填入免費申請之 Gemini API Key (1分鐘於 Google AI Studio 免費取得)',
+                        ? '已綁定 ${aiCtrl.userGeminiApiKeys.length} 組專屬金鑰池，自動輪替保證高可用性，支援 AQ... 與 AIzaSy... 格式。'
+                        : '點此填入免費申請之 Gemini API Key (支援多組金鑰輪替，支援 AQ... 與 AIzaSy...)',
                     style: const TextStyle(fontSize: 12),
                   ),
                   trailing: const Icon(Icons.chevron_right),
@@ -355,7 +355,10 @@ class SettingsScreen extends StatelessWidget {
   }
 
   void _showApiKeySettingsDialog(BuildContext context, AiTutorController aiCtrl) {
-    final textController = TextEditingController(text: aiCtrl.userGeminiApiKey ?? '');
+    final existingKeys = aiCtrl.userGeminiApiKeys;
+    final textController = TextEditingController(
+      text: existingKeys.isNotEmpty ? existingKeys.join('\n') : '',
+    );
     var isObscured = true;
 
     showDialog(
@@ -366,7 +369,7 @@ class SettingsScreen extends StatelessWidget {
             children: [
               Icon(Icons.key, color: AppColors.primary),
               SizedBox(width: 8),
-              Text('Gemini API Key 設定 (BYOK)'),
+              Text('Gemini API Key 金鑰池設定 (BYOK)'),
             ],
           ),
           content: SingleChildScrollView(
@@ -375,10 +378,11 @@ class SettingsScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  '💡 **自備免費金鑰機制 (BYOK)**：\n'
-                  '為保障您的隱私與專屬獨立配額，您可以免費向 Google 官方申請個人專屬的 Gemini 3.7 Flash API Key。\n\n'
-                  '• **100% 免費**：Google AI Studio 提供充裕免費額度，免綁信用卡。\n'
-                  '• **極致安全**：金鑰僅保存在本機裝置（瀏覽器/手機快取），絕不上傳任何伺服器。',
+                  '💡 **自備免費金鑰池機制 (BYOK & Failover)**：\n'
+                  '為保障您的專屬獨立配額，您可以向 Google 官方免費申請一至多組個人專屬的 Gemini 3.8 Flash API Key。\n\n'
+                  '• **支援最新金鑰格式**：完全支援新版 `AQ.Ab8RN6J...` 與經典 `AIzaSy...` 格式。\n'
+                  '• **多組金鑰智慧輪替**：可輸入多組金鑰（一行一把），遇到每日免費額度耗盡 (429) 或異常時，系統會**自動切換至下一組金鑰**！\n'
+                  '• **極致安全**：金鑰僅存於您的本機裝置（瀏覽器快取），絕不上傳任何伺服器。',
                   style: TextStyle(fontSize: 12.5, height: 1.45),
                 ),
                 const SizedBox(height: 14),
@@ -402,12 +406,14 @@ class SettingsScreen extends StatelessWidget {
                 TextField(
                   controller: textController,
                   obscureText: isObscured,
+                  maxLines: isObscured ? 1 : 5,
                   decoration: InputDecoration(
-                    labelText: '輸入您的 Gemini API Key (AIzaSy...)',
-                    hintText: 'AIzaSy...',
+                    labelText: '輸入 Gemini API Key（多組請以換行隔開）',
+                    hintText: "AQ.Ab8RN6J...\n或 AIzaSy...",
                     border: const OutlineInputBorder(),
                     suffixIcon: IconButton(
                       icon: Icon(isObscured ? Icons.visibility_off : Icons.visibility),
+                      tooltip: isObscured ? '顯示全部金鑰' : '隱藏金鑰',
                       onPressed: () => setState(() => isObscured = !isObscured),
                     ),
                   ),
@@ -423,11 +429,11 @@ class SettingsScreen extends StatelessWidget {
                   if (ctx.mounted) {
                     Navigator.of(ctx).pop();
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('已清除個人 Gemini API Key，切換為離線端側模式')),
+                      const SnackBar(content: Text('已清除所有個人 Gemini API Key，切換為離線端側模式')),
                     );
                   }
                 },
-                child: const Text('清除金鑰', style: TextStyle(color: Colors.red)),
+                child: const Text('清除全部金鑰', style: TextStyle(color: Colors.red)),
               ),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
@@ -435,23 +441,31 @@ class SettingsScreen extends StatelessWidget {
             ),
             FilledButton(
               onPressed: () async {
-                final key = textController.text.trim();
-                if (key.isNotEmpty) {
-                  await aiCtrl.saveUserApiKey(key);
+                final raw = textController.text.trim();
+                final keys = raw
+                    .split(RegExp(r'[\n,;]'))
+                    .map((s) => s.trim())
+                    .where((s) => s.isNotEmpty)
+                    .toList();
+                if (keys.isNotEmpty) {
+                  await aiCtrl.saveUserApiKeys(keys);
                   if (ctx.mounted) {
                     Navigator.of(ctx).pop();
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('✅ 已成功儲存個人 Gemini API Key！')),
+                      SnackBar(content: Text('✅ 已成功儲存 ${keys.length} 組個人 Gemini API Key 金鑰池！')),
                     );
                   }
                 } else {
                   await aiCtrl.clearUserApiKey();
                   if (ctx.mounted) {
                     Navigator.of(ctx).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('已清除金鑰')),
+                    );
                   }
                 }
               },
-              child: const Text('儲存設定'),
+              child: const Text('儲存金鑰池'),
             ),
           ],
         ),

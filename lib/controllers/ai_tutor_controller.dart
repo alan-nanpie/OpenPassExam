@@ -55,10 +55,16 @@ class AiTutorController extends ChangeNotifier {
   AiPersona get currentPersona => _currentPersona;
 
   String? get userGeminiApiKey => aiService.localCache.getUserGeminiApiKey();
-  bool get hasUserApiKey => userGeminiApiKey != null && userGeminiApiKey!.isNotEmpty;
+  List<String> get userGeminiApiKeys => aiService.localCache.getUserGeminiApiKeys();
+  bool get hasUserApiKey => userGeminiApiKeys.isNotEmpty;
 
   Future<void> saveUserApiKey(String key) async {
     await aiService.localCache.saveUserGeminiApiKey(key);
+    notifyListeners();
+  }
+
+  Future<void> saveUserApiKeys(List<String> keys) async {
+    await aiService.localCache.saveUserGeminiApiKeys(keys);
     notifyListeners();
   }
 

@@ -27,7 +27,7 @@ class PlayBillingService {
       PlayProductDetail(
         id: AppConstants.skuProMonthly,
         title: 'PassExam Pro 1 個月訂閱',
-        description: '暢享全考科題庫、無限 Gemini 3.7 推理與 NotebookLM 工作區',
+        description: '暢享全考科題庫、無限 Gemini 3.8 Flash 推理與 NotebookLM 工作區',
         price: 'NT\$ 290',
         durationDays: 30,
       ),

@@ -35,6 +35,7 @@ class AppConstants {
   static const String prefKeyOfflineQueue = 'passexam_offline_queue';
   static const String prefKeyAiConfigOverride = 'passexam_ai_config_override';
   static const String prefKeyUserGeminiApiKey = 'passexam_user_gemini_api_key';
+  static const String prefKeyUserGeminiApiKeys = 'passexam_user_gemini_api_keys';
 
   // 預設預載科目
   static const String defaultSubjectId = 'cisco-200-301';

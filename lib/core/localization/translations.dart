@@ -91,7 +91,7 @@ class Translations {
       'rag_loaded_status': '✅ 已載入 {count} 個去雜訊官方教科書切片 (四層防禦過濾)',
       'custom_focus_hint': '自訂聚焦指示詞 (例如: 聚焦於 OSPFv3 與 EIGRP 差異比較)',
       'generate_artifact': '產出此工具內容',
-      'artifact_empty': '點擊上方按鈕，由 Gemini 3.7 自動生成專屬研讀教材！',
+      'artifact_empty': '點擊上方按鈕，由 Gemini 3.8 Flash 自動生成專屬研讀教材！',
 
       // 錯題本
       'wrong_questions_title': '錯題消滅中心',
@@ -106,7 +106,7 @@ class Translations {
 
       // 訂閱升級
       'subscription_title': 'PassExam Pro 尊爵升級',
-      'subscription_subtitle': '解鎖 18+ 科目全量題庫、無限 Gemini 3.7 旗艦推理與 NotebookLM 工作區',
+      'subscription_subtitle': '解鎖 18+ 科目全量題庫、無限 Gemini 3.8 Flash 旗艦推理與 NotebookLM 工作區',
       'plan_monthly': '月費方案 (NT\$ 290 / 月)',
       'plan_quarterly': '季費方案 (NT\$ 790 / 3個月)',
       'plan_annual': '年費特惠方案 (NT\$ 2,490 / 年)',
@@ -219,7 +219,7 @@ class Translations {
       'rag_loaded_status': '✅ Loaded {count} curated official textbook chunks',
       'custom_focus_hint': 'Custom focus instruction (e.g., compare OSPFv3 vs EIGRP)',
       'generate_artifact': 'Generate Artifact',
-      'artifact_empty': 'Click tool buttons above to generate tailored study materials with Gemini 3.7!',
+      'artifact_empty': 'Click tool buttons above to generate tailored study materials with Gemini 3.8 Flash!',
 
       'wrong_questions_title': 'Mistake Elimination Center',
       'filter_by_domain': 'Filter by Domain',
@@ -232,7 +232,7 @@ class Translations {
       'no_wrong_questions': 'Great! No unmastered mistakes.',
 
       'subscription_title': 'PassExam Pro Upgrade',
-      'subscription_subtitle': 'Unlock all 18+ subjects, unlimited Gemini 3.7 Reasoning & NotebookLM Workspace',
+      'subscription_subtitle': 'Unlock all 18+ subjects, unlimited Gemini 3.8 Flash Reasoning & NotebookLM Workspace',
       'plan_monthly': 'Monthly Plan (\$9.99 / mo)',
       'plan_quarterly': 'Quarterly Plan (\$24.99 / 3 mos)',
       'plan_annual': 'Annual Plan (\$79.99 / yr)',

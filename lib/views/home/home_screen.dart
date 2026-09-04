@@ -345,7 +345,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Icon(Icons.auto_awesome, color: AppColors.warning, size: 14),
                     SizedBox(width: 4),
                     Text(
-                      'Gemini 3.7 Dynamic Thinking 思考推理',
+                      'Gemini 3.8 Flash 智慧推理',
                       style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                     ),
                   ],

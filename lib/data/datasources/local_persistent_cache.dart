@@ -149,16 +149,53 @@ class LocalPersistentCache {
     await _prefs.remove(AppConstants.prefKeyAiConfigOverride);
   }
 
-  // 8. 使用者自備 Gemini API 金鑰 (BYOK) - 雙層硬體安全保護
+  // 8. 使用者自備 Gemini API 金鑰 (BYOK) - 支援單一或多組金鑰池輪替
   Future<void> saveUserGeminiApiKey(String apiKey) async {
     final trimmed = apiKey.trim();
     if (_secureVault != null) {
       await _secureVault.writeSecret(AppConstants.prefKeyUserGeminiApiKey, trimmed);
     }
     await _prefs.setString(AppConstants.prefKeyUserGeminiApiKey, trimmed);
+    if (trimmed.isNotEmpty) {
+      await saveUserGeminiApiKeys([trimmed]);
+    }
+  }
+
+  Future<void> saveUserGeminiApiKeys(List<String> apiKeys) async {
+    final cleaned = apiKeys
+        .map((k) => k.trim())
+        .where((k) => k.isNotEmpty)
+        .toSet()
+        .toList();
+    await _prefs.setStringList(AppConstants.prefKeyUserGeminiApiKeys, cleaned);
+    if (cleaned.isNotEmpty) {
+      final primary = cleaned.first;
+      if (_secureVault != null) {
+        await _secureVault.writeSecret(AppConstants.prefKeyUserGeminiApiKey, primary);
+      }
+      await _prefs.setString(AppConstants.prefKeyUserGeminiApiKey, primary);
+    } else {
+      await clearUserGeminiApiKey();
+    }
+  }
+
+  List<String> getUserGeminiApiKeys() {
+    final list = _prefs.getStringList(AppConstants.prefKeyUserGeminiApiKeys);
+    if (list != null && list.isNotEmpty) {
+      return list.map((k) => k.trim()).where((k) => k.isNotEmpty).toList();
+    }
+    final single = getUserGeminiApiKey();
+    if (single != null && single.isNotEmpty) {
+      return [single];
+    }
+    return [];
   }
 
   String? getUserGeminiApiKey() {
+    final keys = _prefs.getStringList(AppConstants.prefKeyUserGeminiApiKeys);
+    if (keys != null && keys.isNotEmpty) {
+      return keys.first.trim();
+    }
     final key = _prefs.getString(AppConstants.prefKeyUserGeminiApiKey);
     if (key == null || key.trim().isEmpty) return null;
     return key.trim();
@@ -177,6 +214,7 @@ class LocalPersistentCache {
       await _secureVault.deleteSecret(AppConstants.prefKeyUserGeminiApiKey);
     }
     await _prefs.remove(AppConstants.prefKeyUserGeminiApiKey);
+    await _prefs.remove(AppConstants.prefKeyUserGeminiApiKeys);
   }
 
   // 9. 考題討論區留言快取

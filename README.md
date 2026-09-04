@@ -21,7 +21,7 @@
   - **Google Cloud Storage (GCS)**：存放 6,688 個官方教科書 RAG 精華切片與高解析度考題拓撲圖檔。
   - **Vertex AI Vector Search / Firestore Vector Search**：768 維度語意向量檢索與考點關聯分析。
 * 🤖 **Google 雙 AI 推理引擎 (Hybrid Dual AI Tutor)**：
-  - **雲端旗艦**：**Google Gemini 3.7 Flash** (Dynamic Thinking 混合推理、過濾 `thought: true` 思考標記、生活化比喻手把手引導)。
+  - **雲端旗艦**：**Google Gemini 3.8 Flash** (自適應 Thinking Level 智慧推理、過濾思考標記、支援多組金鑰池輪替 Failover)。
   - **端側離線**：**Google Gemma 4 (2B) LiteRT-LM** (4096 Tokens 預算解鎖、無字數截斷、100% 斷網離線輔導)。
   - **四層階層式 AI 調度**：`本機覆寫 ➔ RTDB 廣播 ➔ Remote Config ➔ 內建預設值`。
 * 🛡️ **企業級三位一體安全矩陣 (Triple-Defense Security)**：

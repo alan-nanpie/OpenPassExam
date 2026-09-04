@@ -59,7 +59,7 @@ class SubscriptionScreen extends StatelessWidget {
             child: const Column(
               children: [
                 _BenefitRow(text: '✨ 完整解鎖 18+ Cisco 專業科目（5,000+ 原廠高精度題庫）'),
-                _BenefitRow(text: '🤖 無限調度 Google Gemini 3.7 Flash Dynamic Thinking 思考推理'),
+                _BenefitRow(text: '🤖 無限調度 Google Gemini 3.8 Flash 思考推理'),
                 _BenefitRow(text: '☁️ NotebookLM 學習工作區直連 GCS 6,688 官方教科書精華切片'),
                 _BenefitRow(text: '📱 端側 Gemma 4 (2B) 4096 Tokens 離線無限制長篇深度教學'),
                 _BenefitRow(text: '🎧 支援語音有聲書自動導讀與通勤聽題模式'),
