@@ -18,7 +18,7 @@ class AiModelConfig {
 
   AiModelConfig({
     this.primaryModel = 'gemini-3.8-flash',
-    this.fallbackModel = 'gemini-2.5-flash',
+    this.fallbackModel = 'gemini-3.6-flash',
     this.onDeviceModel = 'gemma-4-2b',
     this.temperature = 1.0,
     this.maxTokens = 16384,
@@ -48,9 +48,14 @@ class AiModelConfig {
         ? rawLevel!
         : 'MEDIUM';
 
+    var fbModel = (map['fallback_model'] ?? map['fallbackModel'] ?? 'gemini-3.6-flash').toString();
+    if (fbModel == 'gemini-2.5-flash' || fbModel.contains('gemini-2.0')) {
+      fbModel = 'gemini-3.6-flash';
+    }
+
     return AiModelConfig(
       primaryModel: (map['primary_model'] ?? map['primaryModel'] ?? 'gemini-3.8-flash').toString(),
-      fallbackModel: (map['fallback_model'] ?? map['fallbackModel'] ?? 'gemini-2.5-flash').toString(),
+      fallbackModel: fbModel,
       onDeviceModel: (map['on_device_model'] ?? map['onDeviceModel'] ?? 'gemma-4-2b').toString(),
       temperature: (map['temperature'] as num?)?.toDouble() ?? 1.0,
       maxTokens: (map['max_tokens'] ?? map['maxTokens'] as num?)?.toInt() ?? 16384,

@@ -42,6 +42,9 @@ class AiService {
       if (effective.primaryModel == 'gemini-2.5-flash' || effective.primaryModel.contains('gemini-2.0')) {
         effective = effective.copyWith(primaryModel: 'gemini-3.8-flash');
       }
+      if (effective.fallbackModel == 'gemini-2.5-flash' || effective.fallbackModel.contains('gemini-2.0')) {
+        effective = effective.copyWith(fallbackModel: 'gemini-3.6-flash');
+      }
       if (effective.maxTokens < 16384) {
         effective = effective.copyWith(maxTokens: 16384, thinkingBudget: 4096);
       }
@@ -331,7 +334,7 @@ class AiService {
       modelName,
       'gemini-3.8-flash',
       'gemini-3.7-flash',
-      'gemini-2.5-flash',
+      'gemini-3.6-flash',
     }.toList();
 
     Exception? lastException;
@@ -413,21 +416,21 @@ class AiService {
           url,
           headers: {'Content-Type': 'application/json'},
           body: body,
-        ).timeout(const Duration(seconds: 40));
+        ).timeout(const Duration(seconds: 25));
 
-        // 遇到 503 (High Demand 暫時性壅塞)，若為 gemini-3.8-flash 則自動退避 1.5 秒重試一次
+        // 遇到 503 (High Demand 暫時性壅塞)，若為 gemini-3.8-flash 則自動退避 1.0 秒重試一次
         if (response.statusCode == 503 && targetModel == 'gemini-3.8-flash') {
           AiDebugLogService.instance.warn(
             'GeminiApi',
-            '模型 [$targetModel] 遭遇 503 暫時尖峰壅塞，進行退避 1.5 秒快速重試 (Quick Retry)...',
-            {'statusCode': 503, 'retryAfterMs': 1500},
+            '模型 [$targetModel] 遭遇 503 暫時尖峰壅塞，進行退避 1 秒快速重試 (Quick Retry)...',
+            {'statusCode': 503, 'retryAfterMs': 1000},
           );
-          await Future.delayed(const Duration(milliseconds: 1500));
+          await Future.delayed(const Duration(milliseconds: 1000));
           response = await http.post(
             url,
             headers: {'Content-Type': 'application/json'},
             body: body,
-          ).timeout(const Duration(seconds: 40));
+          ).timeout(const Duration(seconds: 25));
         }
 
         stopwatch.stop();
@@ -459,10 +462,13 @@ class AiService {
 
         final errDetail = 'HTTP ${response.statusCode}: ${response.body}';
 
-        // 若為 401/403/400 (金鑰未授權或無效)，代表整把金鑰失效，不需再換模型嘗試，直接拋出讓外層快速換下一把金鑰
-        final isAuthOrKeyError = response.statusCode == 401 ||
+        // 若為 401/403 (金鑰未授權)、400 (金鑰無效) 或 429 (整把金鑰額度耗盡 RESOURCE_EXHAUSTED)
+        // 代表該金鑰無法服務任何模型，立即拋出以觸發外層跳轉至下一把金鑰
+        final isFatalKeyError = response.statusCode == 401 ||
             response.statusCode == 403 ||
-            (response.statusCode == 400 && response.body.contains('API_KEY_INVALID'));
+            response.statusCode == 429 ||
+            (response.statusCode == 400 && response.body.contains('API_KEY_INVALID')) ||
+            response.body.contains('RESOURCE_EXHAUSTED');
 
         AiDebugLogService.instance.warn(
           'GeminiApi',
@@ -471,19 +477,23 @@ class AiService {
             'model': targetModel,
             'statusCode': response.statusCode,
             'responseBody': response.body,
-            'action': isAuthOrKeyError ? '金鑰無效，立即跳至下一把金鑰' : (mIdx < candidateModels.length - 1 ? '切換下一候選模型: ${candidateModels[mIdx + 1]}' : '無下一模型'),
+            'action': isFatalKeyError
+                ? (response.statusCode == 429 ? '金鑰配額已耗盡 (429)，立即跳至下一把金鑰' : '金鑰無效，立即跳至下一把金鑰')
+                : (mIdx < candidateModels.length - 1 ? '切換下一候選模型: ${candidateModels[mIdx + 1]}' : '無下一模型'),
           },
         );
 
         lastException = Exception('Gemini API Error ($targetModel): $errDetail');
-        if (isAuthOrKeyError) {
+        if (isFatalKeyError) {
           throw lastException;
         }
       } catch (e) {
         stopwatch.stop();
         final errStr = e.toString();
-        final isAuthOrKeyError = errStr.contains('401') ||
+        final isFatalKeyError = errStr.contains('401') ||
             errStr.contains('403') ||
+            errStr.contains('429') ||
+            errStr.contains('RESOURCE_EXHAUSTED') ||
             errStr.contains('API_KEY_INVALID') ||
             errStr.contains('ACCESS_TOKEN_TYPE_UNSUPPORTED');
 
@@ -494,11 +504,13 @@ class AiService {
             'model': targetModel,
             'exception': errStr,
             'durationMs': stopwatch.elapsedMilliseconds,
-            'action': isAuthOrKeyError ? '金鑰無效，立即中斷當前金鑰' : (mIdx < candidateModels.length - 1 ? '切換下一候選模型: ${candidateModels[mIdx + 1]}' : '無下一模型'),
+            'action': isFatalKeyError
+                ? (errStr.contains('429') || errStr.contains('RESOURCE_EXHAUSTED') ? '金鑰配額耗盡，立即中斷當前金鑰' : '金鑰無效，立即中斷當前金鑰')
+                : (mIdx < candidateModels.length - 1 ? '切換下一候選模型: ${candidateModels[mIdx + 1]}' : '無下一模型'),
           },
         );
         lastException = Exception('Gemini API Exception ($targetModel): $e');
-        if (isAuthOrKeyError) {
+        if (isFatalKeyError) {
           throw lastException;
         }
       }
@@ -560,7 +572,7 @@ class AiService {
     final cleanKey = apiKey.trim().replaceAll('"', '').replaceAll("'", '');
     if (cleanKey.isEmpty) return 'API Key 不能為空';
     
-    final probeModels = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-2.5-flash'];
+    final probeModels = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash'];
     final maskedKey = cleanKey.length > 8
         ? '${cleanKey.substring(0, 4)}...${cleanKey.substring(cleanKey.length - 4)}'
         : '***';
