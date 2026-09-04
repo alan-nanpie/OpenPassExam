@@ -44,30 +44,15 @@ class AiOfflineReasoningEngine {
       }
     }
 
-    // 2. 針對提問進行領域頂尖專家與首席顧問之核心深度解答
-    sb.writeln('### 💡 頂尖專家專業剖析：「$cleanPrompt」\n');
+    // 2. 針對提問進行核心深度解答
+    sb.writeln('### 💡 核心技術深入解析：「$cleanPrompt」\n');
 
     // 依據問題內容判斷主題並動態生成極致詳盡之技術解答
     _generateTopicSpecificAnswer(sb, cleanPrompt, lowerPrompt, question, persona);
 
-    // 3. 領域首席顧問進階架構與實踐指引
-    sb.writeln('\n### 🏛️ 首席技術顧問實務與架構指引');
-    switch (persona) {
-      case AiPersona.friendlyTutor:
-        sb.writeln('#### 🔬 技術核心機制與規範深度剖析 (RFC / Architecture Details)');
-        _generateExpertDeepDive(sb, lowerPrompt);
-        break;
-
-      case AiPersona.cliEngineer:
-        sb.writeln('#### 🛠️ 企業級工程實戰配置與深入排錯 (Production Deployment & Troubleshooting)');
-        _generateCliGuide(sb, lowerPrompt);
-        break;
-
-      case AiPersona.ccieArchitect:
-        sb.writeln('#### 📐 首席架構師全域設計、效能瓶頸與權衡分析 (Trade-offs & Resilience)');
-        _generateArchitectAdvice(sb, lowerPrompt);
-        break;
-    }
+    // 3. 深入技術機制與工程實務解析（整合為一體，取消 Persona 角色分流與標籤）
+    sb.writeln('\n### 🔬 核心機制與工程實務深度解析');
+    _generateExpertDeepDive(sb, lowerPrompt);
 
     // 4. 參考教材與標準規範切片 (若有檢索到)
     if (ragChunks != null && ragChunks.isNotEmpty) {
@@ -89,17 +74,17 @@ class AiOfflineReasoningEngine {
   ) {
     // 招呼語判斷
     if (lower.contains('你好') || lower.contains('哈囉') || lower.contains('hello') || lower.contains('hi') || lower.contains('早安') || lower.contains('午安') || lower.contains('晚安')) {
-      sb.writeln('您好！我是您的 **PassExam 專屬領域首席技術顧問與頂尖專家**。我專精於網路通訊協定、企業級系統架構、雲端原生技術、資訊安全與各項全球頂尖技術認證。');
-      sb.writeln('無論您提出任何專業理論、RFC 規範、生產環境實戰故障排除、指令配置細節或架構選型評估，我都將以業界頂尖專家的規格為您提供最權威且詳盡的完整剖析！');
+      sb.writeln('您好！我是您的 **PassExam 智慧學習技術助教**。我專精於各項網路通訊協定、雲端原生架構、資訊安全與專業認證重點。');
+      sb.writeln('無論您提出任何理論規範、生產環境實戰故障排除、指令配置細節或架構評估，我都將為您提供最清晰且詳盡的完整解答！');
       return;
     }
 
     // 詢問自己身分
     if (lower.contains('你是誰') || lower.contains('你是') || lower.contains('介紹自己') || lower.contains('who are you')) {
-      sb.writeln('我是 **PassExam 領域頂尖專家與首席技術顧問**，具備【端側離線與雲端旗艦雙引擎調度】：');
+      sb.writeln('我是 **PassExam 智慧學習技術助教**，具備【端側離線與雲端旗艦雙引擎調度】：');
       sb.writeln('- ⚡ **端側極速離線引擎**：支援 Google Gemma 4 (2B) 與 Web Nano，無網路狀態下仍可產出完整萬字級架構與指令剖析。');
-      sb.writeln('- ☁️ **雲端旗艦多模態**：調度 Google Gemini 2.5 Flash 旗艦架構，具備深度推理、圖文拓撲多模態分析與生產實務評估能力。');
-      sb.writeln('- 🎯 **專家諮詢定位**：徹底摒棄簡略回答與表面比喻，為您提供白皮書等級的底層機制、配置範例、架構權衡與排錯思路。');
+      sb.writeln('- ☁️ **雲端旗艦多模態**：調度 Google Gemini 2.5/3.8 Flash 旗艦架構，具備深度推理、圖文拓撲多模態分析與生產實務評估能力。');
+      sb.writeln('- 🎯 **專業解答定位**：直指問題核心，為您提供底層機制、配置範例、架構權衡與實務排錯思路。');
       return;
     }
 
@@ -219,14 +204,14 @@ class AiOfflineReasoningEngine {
     }
 
     // 一般性專業解答
-    sb.writeln('針對您詢問的「$prompt」，我們可以從「概念本質」、「運作流程」與「實務應用」三個維度來完整解析：');
-    sb.writeln('1. **概念本質**：該技術核心在於解決系統間的通訊效能、可靠性與可擴充性問題。');
-    sb.writeln('2. **標準作業流程**：通常包含初始化交握、身分驗證/參數協商、主體數據傳輸，以及完畢後的優雅關閉。');
-    sb.writeln('3. **實務建議**：在規劃架構時，需權衡頻寬成本、延遲敏感度以及容錯恢復時間 (RTO/RPO)。');
+    sb.writeln('針對「$prompt」的核心技術重點解析如下：');
+    sb.writeln('- **核心技術原理**：重點在於確保系統通訊的高效性、可靠性與水平擴充能力。');
+    sb.writeln('- **標準處理流程**：包含連線建立與協商、身份鑑別、主資料傳輸以及安全關閉等階段。');
+    sb.writeln('- **工程實務考量**：在生產環境中需綜合評估頻寬開銷、延遲容忍度與高可用性容錯設計。');
   }
 
   static void _generateExpertDeepDive(StringBuffer sb, String lower) {
-    if (lower.contains('subnet') || lower.contains('ip') || lower.contains('cidr') || lower.contains('vlsm')) {
+    if (lower.contains('subnet') || lower.contains('ip') || lower.contains('cidr') || lower.contains('vlsm') || lower.contains('子網路') || lower.contains('/24') || lower.contains('/30')) {
       sb.writeln('1. **RFC 4632 無類別域間路由 (CIDR) 底層位址空間數學模型**：');
       sb.writeln('   - IPv4 位址空間總量為 \\(2^{32} = 4,294,967,296\\) 個位址。子網路劃分本質是將主機位元借位至網路位元（Borrowing Bits）。');
       sb.writeln('   - 每向主機位元借 1 個 bit，可劃分的子網路數即翻倍（\\(2^k\\)），而每個子網路的可用主機容量減半。');
@@ -236,7 +221,7 @@ class AiOfflineReasoningEngine {
       sb.writeln('3. **反向遮罩 (Wildcard Mask) 在 ACL 與 OSPF 中的微架構比對**：');
       sb.writeln('   - Wildcard Mask 中的 `0` 代表「必須嚴格比對」，`1` 代表「忽略比對（Don\'t Care）」。');
       sb.writeln('   - 專家技巧：非連續 Wildcard（如 `0.0.0.254`）可用於單一 ACL 規則比對所有奇數或偶數 IP，大幅壓縮硬體 TCAM 表項。');
-    } else if (lower.contains('vlan') || lower.contains('switch') || lower.contains('trunk') || lower.contains('stp')) {
+    } else if (lower.contains('vlan') || lower.contains('switch') || lower.contains('trunk') || lower.contains('stp') || lower.contains('交換器')) {
       sb.writeln('1. **IEEE 802.1Q 訊框封裝與 4-Byte Tag 結構細節**：');
       sb.writeln('   - **TPID (Tag Protocol Identifier)**：固定為 `0x8100`，指示此為 802.1Q 標記訊框。');
       sb.writeln('   - **TCI (Tag Control Information)**：包含 3-bit PCP（802.1p 服務優先級 QoS）、1-bit DEI（丟棄指示）、以及 12-bit VLAN ID（範圍 1 ~ 4094）。');

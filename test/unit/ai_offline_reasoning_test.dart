@@ -12,23 +12,23 @@ void main() {
       );
 
       expect(response.contains('PassExam'), true);
-      expect(response.contains('頂尖專家'), true);
+      expect(response.contains('智慧學習技術助教'), true);
       expect(response.contains('端側 Gemma 4 (2B)'), true);
     });
 
     test('能夠針對學員提出的子網路計算問題，給予精確公式與 /24 計算', () {
       final response = AiOfflineReasoningEngine.generateResponse(
         prompt: '請問子網路 /24 可以容納多少台可用主機？',
-        persona: AiPersona.cliEngineer,
+        persona: AiPersona.friendlyTutor,
       );
 
       expect(response.contains('子網路'), true);
       expect(response.contains('254'), true);
       expect(response.contains('2^(32 - n) - 2'), true);
-      expect(response.contains('Device# configure terminal'), true);
+      expect(response.contains('VLSM'), true);
     });
 
-    test('能夠針對學員提出的 VLAN 問題，結合頂尖專家視角給予 IEEE 802.1Q 標籤與交換技術深層解析', () {
+    test('能夠針對學員提出的 VLAN 問題，給予 IEEE 802.1Q 標籤與交換技術深層解析', () {
       final response = AiOfflineReasoningEngine.generateResponse(
         prompt: '什麼是 VLAN？它有什麼好處？',
         persona: AiPersona.friendlyTutor,
@@ -43,12 +43,12 @@ void main() {
     test('能夠針對學員提出的雲端運算 (AWS/GCP) 問題，給予架構設計分析', () {
       final response = AiOfflineReasoningEngine.generateResponse(
         prompt: '請問 AWS S3 與 Cloud Run 的使用場景是什麼？',
-        persona: AiPersona.ccieArchitect,
+        persona: AiPersona.friendlyTutor,
       );
 
       expect(response.contains('雲端'), true);
       expect(response.contains('無伺服器與容器化'), true);
-      expect(response.contains('首席架構師全域設計'), true);
+      expect(response.contains('核心機制與工程實務'), true);
     });
 
     test('當有考題上下文時，解答能包含考題題目與選項解析', () {

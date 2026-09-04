@@ -8,7 +8,6 @@ import '../../controllers/ai_tutor_controller.dart';
 import '../../services/offline_model_manager.dart';
 import '../../services/ai_debug_log_service.dart';
 import '../../core/utils/file_exporter.dart';
-import 'persona_selector_widget.dart';
 
 class AiTutorScreen extends StatefulWidget {
   const AiTutorScreen({super.key});
@@ -194,12 +193,6 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
               ),
             ),
 
-          // Persona 切換列
-          PersonaSelectorWidget(
-            currentPersona: aiCtrl.currentPersona,
-            onPersonaSelected: (p) => aiCtrl.setPersona(p),
-          ),
-          const Divider(height: 1),
 
           // 對話歷史訊息列表
           Expanded(
