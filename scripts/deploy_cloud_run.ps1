@@ -178,7 +178,14 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
-# 6. 取得並輸出線上正式網址
+# 6. 自動清理歷史未標籤映像檔 (保持儲存庫乾淨並節省費用)
+$CLEAN_SCRIPT = Join-Path $SCRIPT_DIR "clean_old_images.ps1"
+if (Test-Path $CLEAN_SCRIPT) {
+    Write-Step "6/6" "自動清理 Artifact Registry 中過期的未標籤 (Untagged) 歷史映像檔..."
+    & $CLEAN_SCRIPT
+}
+
+# 7. 取得並輸出線上正式網址
 $SERVICE_URL = (gcloud run services describe $SERVICE_NAME --platform managed --region $REGION --project=$PROJECT_ID --format="value(status.url)" 2>$null).Trim()
 
 Write-Host "`n🎉 ========================================================" -ForegroundColor Green
