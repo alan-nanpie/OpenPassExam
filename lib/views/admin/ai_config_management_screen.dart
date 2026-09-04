@@ -18,6 +18,7 @@ class _AiConfigManagementScreenState extends State<AiConfigManagementScreen> {
   late double _temperature;
   late int _maxTokens;
   late int _thinkingBudget;
+  late String _thinkingLevel;
   late bool _preferOffline;
 
   @override
@@ -32,6 +33,7 @@ class _AiConfigManagementScreenState extends State<AiConfigManagementScreen> {
     _temperature = cfg.temperature;
     _maxTokens = cfg.maxTokens;
     _thinkingBudget = cfg.thinkingBudget;
+    _thinkingLevel = cfg.thinkingLevel;
     _preferOffline = cfg.preferOffline;
   }
 
@@ -143,11 +145,63 @@ class _AiConfigManagementScreenState extends State<AiConfigManagementScreen> {
         ),
         const SizedBox(height: 20),
 
+        // 思考強度等級 (Gemini 3.8 Flash 規範：LOW, MEDIUM, HIGH，禁止 MINIMAL)
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('思考強度等級 (Thinking Level - 3.8 Flash):', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text(
+                  _thinkingLevel,
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment<String>(
+                    value: 'LOW',
+                    label: Text('LOW (極速)'),
+                    tooltip: '快速檢索與精簡總結',
+                  ),
+                  ButtonSegment<String>(
+                    value: 'MEDIUM',
+                    label: Text('MEDIUM (預設)'),
+                    tooltip: '一般解題與推論最佳平衡點',
+                  ),
+                  ButtonSegment<String>(
+                    value: 'HIGH',
+                    label: Text('HIGH (深度)'),
+                    tooltip: '複雜考題多步驟深度推理與拓撲分析',
+                  ),
+                ],
+                selected: {_thinkingLevel},
+                onSelectionChanged: (Set<String> newSelection) {
+                  setState(() {
+                    _thinkingLevel = newSelection.first;
+                  });
+                },
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              '⚠️ 官方規範：MINIMAL 不適用於 3.8 Flash；後端直接由思考等級決定確定性與推論深度。',
+              style: TextStyle(fontSize: 11, color: Colors.grey),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
         // 推論溫度
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('推論溫度 (Temperature):', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text('推論溫度 (Temperature - 舊版相容):', style: TextStyle(fontWeight: FontWeight.bold)),
             Text('$_temperature', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
           ],
         ),
@@ -159,7 +213,13 @@ class _AiConfigManagementScreenState extends State<AiConfigManagementScreen> {
           label: '$_temperature',
           onChanged: (v) => setState(() => _temperature = double.parse(v.toStringAsFixed(1))),
         ),
-        const SizedBox(height: 10),
+        const Padding(
+          padding: EdgeInsets.only(bottom: 12),
+          child: Text(
+            '📌 提示：Gemini 3.8 Flash 官方已停用取樣溫度參數，此設定僅對舊版降級備用模型生效。',
+            style: TextStyle(fontSize: 11, color: Colors.grey),
+          ),
+        ),
 
         // Max Tokens
         Row(
@@ -179,11 +239,11 @@ class _AiConfigManagementScreenState extends State<AiConfigManagementScreen> {
         ),
         const SizedBox(height: 10),
 
-        // Thinking 預算
+        // Thinking 預算 (舊版相容)
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('思考預算 (Thinking Budget Tokens):', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text('舊版思考預算 (Thinking Budget Tokens):', style: TextStyle(fontWeight: FontWeight.bold)),
             Text('$_thinkingBudget', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
           ],
         ),
@@ -252,6 +312,7 @@ class _AiConfigManagementScreenState extends State<AiConfigManagementScreen> {
         temperature: _temperature,
         maxTokens: _maxTokens,
         thinkingBudget: _thinkingBudget,
+        thinkingLevel: _thinkingLevel,
         preferOffline: _preferOffline,
       ),
     );

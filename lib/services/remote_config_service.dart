@@ -2,11 +2,12 @@ import '../data/models/ai_model_config.dart';
 
 class RemoteConfigService {
   AiModelConfig _remoteConfig = AiModelConfig(
-    primaryModel: 'gemini-2.5-flash',
+    primaryModel: 'gemini-3.8-flash',
     fallbackModel: 'gemini-2.5-flash',
     temperature: 1.0,
     maxTokens: 4096,
     thinkingBudget: 2048,
+    thinkingLevel: 'MEDIUM',
     sourceLayer: AiConfigLayer.remoteConfig,
   );
 

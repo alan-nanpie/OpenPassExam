@@ -32,7 +32,8 @@ void main() {
 
     test('預設應解析出 Remote Config / 預設配置層級', () {
       final config = aiService.resolveEffectiveAiConfig();
-      expect(config.primaryModel, 'gemini-2.5-flash');
+      expect(config.primaryModel, 'gemini-3.8-flash');
+      expect(config.thinkingLevel, 'MEDIUM');
       expect(config.sourceLayer, AiConfigLayer.remoteConfig);
     });
 
@@ -58,7 +59,7 @@ void main() {
       expect(config.sourceLayer, AiConfigLayer.localOverride);
     });
 
-    test('應該正確過濾 Gemini 3.7 Flash 的 <thought>...</thought> 思考內容', () {
+    test('應該正確過濾 Gemini 3.7 / 3.8 Flash 的 <thought>...</thought> 思考內容', () {
       const rawOutput = '''
 <thought>
 這是模型內部的自我驗證推理流程，正在計算 OSPF 的 AD 值是否為 110...
@@ -71,6 +72,29 @@ OSPF 協定的預設管理距離為 110，採用 Dijkstra 最短路徑演算法�
       expect(cleanOutput.contains('<thought>'), false);
       expect(cleanOutput.contains('這是模型內部的自我驗證'), false);
       expect(cleanOutput.contains('OSPF 協定的預設管理距離為 110'), true);
+    });
+
+    test('Gemini 3.8 Flash 配置應嚴格防護 MINIMAL 並正確序列化 thinking_level', () {
+      // 預設值驗證
+      final defaultConfig = AiModelConfig();
+      expect(defaultConfig.primaryModel, 'gemini-3.8-flash');
+      expect(defaultConfig.thinkingLevel, 'MEDIUM');
+
+      // 序列化成 Map
+      final map = defaultConfig.toMap();
+      expect(map['thinking_level'], 'MEDIUM');
+      expect(map['primary_model'], 'gemini-3.8-flash');
+
+      // 反序列化合法列舉
+      final highConfig = AiModelConfig.fromMap({'thinking_level': 'HIGH'});
+      expect(highConfig.thinkingLevel, 'HIGH');
+
+      final lowConfig = AiModelConfig.fromMap({'thinking_level': 'low'});
+      expect(lowConfig.thinkingLevel, 'LOW');
+
+      // 嚴格阻擋 MINIMAL（官方禁止，回退為 MEDIUM）
+      final minimalAttempt = AiModelConfig.fromMap({'thinking_level': 'MINIMAL'});
+      expect(minimalAttempt.thinkingLevel, 'MEDIUM');
     });
   });
 }

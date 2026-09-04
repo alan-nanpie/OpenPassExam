@@ -198,6 +198,7 @@ class AiService {
     // gemini-2.0-flash 已於 2026/6/1 正式停用，僅保留可用模型
     final candidateModels = <String>{
       modelName,
+      'gemini-3.8-flash',
       'gemini-2.5-flash',
       'gemini-1.5-flash',
     }.toList();
@@ -222,16 +223,28 @@ class AiService {
         }
         userContent.writeln('【學員提問】: $prompt');
 
+        final isGemini3Family = targetModel.startsWith('gemini-3');
         final generationConfig = <String, dynamic>{
-          'temperature': config.temperature,
           'maxOutputTokens': config.maxTokens,
         };
 
-        // 僅在具備 thinking 支援的模型中傳遞 thinkingConfig，防止 400 Bad Request
-        if (targetModel.contains('thinking') && config.thinkingBudget > 0) {
+        if (isGemini3Family) {
+          // Gemini 3.8 Flash 官方規範：
+          // 1. 移除 temperature, top_p, top_k, frequency_penalty, presence_penalty, candidate_count
+          // 2. thinkingConfig 採用 thinkingLevel 列舉 (LOW, MEDIUM, HIGH)，嚴格禁止 MINIMAL
+          final level = config.thinkingLevel.toUpperCase();
+          final validLevel = (level == 'LOW' || level == 'HIGH') ? level : 'MEDIUM';
           generationConfig['thinkingConfig'] = {
-            'thinkingBudget': config.thinkingBudget,
+            'thinkingLevel': validLevel,
           };
+        } else {
+          // 針對舊版備用模型 (如 gemini-2.5-flash) 保持相容參數
+          generationConfig['temperature'] = config.temperature;
+          if (targetModel.contains('thinking') && config.thinkingBudget > 0) {
+            generationConfig['thinkingConfig'] = {
+              'thinkingBudget': config.thinkingBudget,
+            };
+          }
         }
 
         final body = jsonEncode({
@@ -326,7 +339,7 @@ class AiService {
     if (cleanKey.isEmpty) return 'API Key 不能為空';
     try {
       final url = Uri.parse(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$cleanKey',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=$cleanKey',
       );
       final body = jsonEncode({
         'contents': [
