@@ -296,9 +296,15 @@ class AiService {
         ? '${cleanApiKey.substring(0, 4)}...${cleanApiKey.substring(cleanApiKey.length - 4)}'
         : '***';
 
+    var timeoutCount = 0;
+
     for (var mIdx = 0; mIdx < candidateModels.length; mIdx++) {
       final targetModel = candidateModels[mIdx];
       final stopwatch = Stopwatch()..start();
+      // 若該金鑰在此輪已發生過 1 次逾時，備用模型只給予 5 秒快速探測，避免長時間卡住
+      final timeoutDuration = (timeoutCount > 0)
+          ? const Duration(seconds: 5)
+          : const Duration(seconds: 10);
       try {
         final url = Uri.parse(
           'https://generativelanguage.googleapis.com/v1beta/models/$targetModel:generateContent?key=$cleanApiKey',
@@ -356,12 +362,13 @@ class AiService {
 
         AiDebugLogService.instance.info(
           'GeminiApi',
-          '發送請求至模型 [$targetModel] (金鑰: $maskedKey, maxTokens: ${config.maxTokens})',
+          '發送請求至模型 [$targetModel] (金鑰: $maskedKey, 超時上限: ${timeoutDuration.inSeconds}s, maxTokens: ${config.maxTokens})',
           {
             'model': targetModel,
             'endpoint': 'https://generativelanguage.googleapis.com/v1beta/models/$targetModel:generateContent',
             'generationConfig': generationConfig,
             'promptLength': prompt.length,
+            'timeoutSec': timeoutDuration.inSeconds,
             'hasQuestionContext': question != null,
           },
         );
@@ -370,7 +377,7 @@ class AiService {
           url,
           headers: {'Content-Type': 'application/json'},
           body: body,
-        ).timeout(const Duration(seconds: 8));
+        ).timeout(timeoutDuration);
 
         // 遇到 503 (High Demand 暫時性壅塞)，若為 gemini-3.8-flash 則進行一次 0.5 秒退避重試
         if (response.statusCode == 503 && targetModel == 'gemini-3.8-flash') {
@@ -384,7 +391,7 @@ class AiService {
             url,
             headers: {'Content-Type': 'application/json'},
             body: body,
-          ).timeout(const Duration(seconds: 8));
+          ).timeout(timeoutDuration);
         }
 
         stopwatch.stop();
@@ -444,14 +451,20 @@ class AiService {
       } catch (e) {
         stopwatch.stop();
         final errStr = e.toString();
-        // 遇到 401/403/429 或 連線 TimeoutException，立即斷定該金鑰網路阻滯，中斷當前金鑰直接換下一把，避免卡住！
-        final isFatalOrTimeout = errStr.contains('401') ||
+        if (errStr.contains('TimeoutException')) {
+          timeoutCount++;
+        }
+
+        // 遇到 401/403/429 立即斷定該金鑰網路阻滯，中斷當前金鑰直接換下一把！
+        final isFatalAuthOrQuota = errStr.contains('401') ||
             errStr.contains('403') ||
             errStr.contains('429') ||
             errStr.contains('RESOURCE_EXHAUSTED') ||
             errStr.contains('API_KEY_INVALID') ||
-            errStr.contains('TimeoutException') ||
             errStr.contains('ACCESS_TOKEN_TYPE_UNSUPPORTED');
+
+        // 若此金鑰累計逾時達 2 次（例如 3.8 等 10s + 3.7 等 5s），代表此金鑰連線嚴重受阻，啟動熔斷換下一把！
+        final shouldBreakKey = isFatalAuthOrQuota || (timeoutCount >= 2);
 
         AiDebugLogService.instance.error(
           'GeminiApi',
@@ -460,11 +473,14 @@ class AiService {
             'model': targetModel,
             'exception': errStr,
             'durationMs': stopwatch.elapsedMilliseconds,
-            'action': isFatalOrTimeout ? '觸發極速換金鑰 (Timeout/Auth/Quota)，中斷當前金鑰' : (mIdx < candidateModels.length - 1 ? '切換下一候選模型: ${candidateModels[mIdx + 1]}' : '無下一模型'),
+            'timeoutCount': timeoutCount,
+            'action': shouldBreakKey
+                ? (isFatalAuthOrQuota ? '觸發極速換金鑰 (Auth/Quota 異常)' : '金鑰累計逾時達 2 次，觸發連線熔斷，換下一把金鑰')
+                : (mIdx < candidateModels.length - 1 ? '切換下一候選模型: ${candidateModels[mIdx + 1]}' : '無下一模型'),
           },
         );
         lastException = Exception('Gemini API Exception ($targetModel): $e');
-        if (isFatalOrTimeout) {
+        if (shouldBreakKey) {
           throw lastException;
         }
       }
@@ -550,7 +566,7 @@ class AiService {
           url,
           headers: {'Content-Type': 'application/json'},
           body: body,
-        ).timeout(const Duration(seconds: 8));
+        ).timeout(const Duration(seconds: 5));
 
         if (response.statusCode == 200) {
           AiDebugLogService.instance.success(
