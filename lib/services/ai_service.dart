@@ -36,6 +36,12 @@ class AiService {
     // 1. 本機覆寫
     final localOverride = localCache.getLocalAiConfig();
     if (localOverride != null) {
+      // 若本機覆寫中殘留舊版預設模型（如 gemini-2.5-flash / gemini-2.0-flash），自動平滑升級至 gemini-3.8-flash
+      if (localOverride.primaryModel == 'gemini-2.5-flash' || localOverride.primaryModel.contains('gemini-2.0')) {
+        final upgraded = localOverride.copyWith(primaryModel: 'gemini-3.8-flash');
+        localCache.saveLocalAiConfig(upgraded);
+        return upgraded;
+      }
       return localOverride;
     }
 
@@ -88,6 +94,26 @@ class AiService {
     String? apiKey,
     bool forceCloud = false,
   }) async {
+    final result = await askAiTutorDetailed(
+      prompt: prompt,
+      questionContext: questionContext,
+      ragChunks: ragChunks,
+      persona: persona,
+      apiKey: apiKey,
+      forceCloud: forceCloud,
+    );
+    return result.text;
+  }
+
+  /// 精準推論接口：回傳回答文本與實際調度成功之模型名稱
+  Future<({String text, String modelUsed, String? failureReason})> askAiTutorDetailed({
+    required String prompt,
+    Question? questionContext,
+    List<RagKnowledgeChunk>? ragChunks,
+    AiPersona persona = AiPersona.friendlyTutor,
+    String? apiKey,
+    bool forceCloud = false,
+  }) async {
     final offline = await isOffline();
     final config = resolveEffectiveAiConfig();
     final offlineReady = offlineModelManager?.isModelReady ?? true;
@@ -96,7 +122,7 @@ class AiService {
 
     // === 使用者明確要求雲端模式但沒有填入 API Key ===
     if (forceCloud && !hasApiKey) {
-      return '⚠️ **[雲端模式需要 Gemini API Key]**\n\n'
+      final text = '⚠️ **[雲端模式需要 Gemini API Key]**\n\n'
           '您目前選擇了雲端 Gemini 旗艦推論模式，但尚未設定 API Key。\n\n'
           '**如何啟用雲端模式（3 步驟、100% 免費）**：\n'
           '1. 點擊右上角 🔑 **金鑰圖示**，或點擊上方黃色提示列\n'
@@ -106,24 +132,26 @@ class AiService {
           '---\n'
           '🛡️ **以下由本機端側智能引擎為您即時回答：**\n\n'
           '${_generateOnDeviceGemmaResponse(prompt: prompt, question: questionContext, persona: persona, ragChunks: ragChunks)}';
+      return (text: text, modelUsed: 'Gemma 4 (2B) 離線', failureReason: '未配置 Google Gemini API Key (BYOK)');
     }
 
     // === 【第 1 優先】：端側離線 AI 模型 (Gemma 4 2B / Chrome Nano) ===
-    // 觸發時機：設備離線、未設定 API Key 且未強制雲端、或使用者手動勾選「優先使用離線模型」且未強制雲端
     if (offline || (!forceCloud && !hasApiKey) || (!forceCloud && isPreferOffline && offlineReady)) {
       if (offlineModelManager != null && offlineModelManager!.isModelReady) {
-        return await offlineModelManager!.runLocalInference(
+        final text = await offlineModelManager!.runLocalInference(
           prompt: prompt,
           questionTitle: questionContext?.title,
           personaStyle: persona.name,
         );
+        return (text: text, modelUsed: 'Gemma 4 (2B) 離線', failureReason: null);
       }
-      return _generateOnDeviceGemmaResponse(
+      final text = _generateOnDeviceGemmaResponse(
         prompt: prompt,
         question: questionContext,
         persona: persona,
         ragChunks: ragChunks,
       );
+      return (text: text, modelUsed: 'Gemma 4 (2B) 離線', failureReason: null);
     }
 
     // === 【第 2 優先】：雲端 Google 最新 AI 多模態模型 ===
@@ -137,7 +165,11 @@ class AiService {
         ragChunks: ragChunks,
         persona: persona,
       );
-      return filterThinkingOutput(cloudResponse);
+      return (
+        text: filterThinkingOutput(cloudResponse.text),
+        modelUsed: cloudResponse.modelUsed,
+        failureReason: null,
+      );
     } catch (e) {
       // === 【第 3 優先 (備用)】：主流且最穩定多模態模型 (Gemini 2.5 Flash) ===
       try {
@@ -150,8 +182,12 @@ class AiService {
           ragChunks: ragChunks,
           persona: persona,
         );
-        final cleanFallback = filterThinkingOutput(fallbackResponse);
-        return '🛡️ **[已自動調度備用穩定模型：${config.fallbackModel}]**\n\n$cleanFallback';
+        final cleanFallback = filterThinkingOutput(fallbackResponse.text);
+        return (
+          text: '🛡️ **[已自動調度備用穩定模型：${fallbackResponse.modelUsed}]**\n\n$cleanFallback',
+          modelUsed: fallbackResponse.modelUsed,
+          failureReason: null,
+        );
       } catch (e2) {
         // 雙雲端模型均連線失敗時，由本地智能推理引擎無縫接管，確保百分之百針對問題回答
         final localAnswer = _generateSimulatedHighQualityResponse(
@@ -178,12 +214,13 @@ class AiService {
           errorDiagnosis = errStr;
         }
 
-        return '⚠️ **[雲端 API 連線異常提示]**\n> 🔍 **診斷原因**：$errorDiagnosis\n> 🛡️ **已自動由本機端側智能引擎接管推論**\n\n$localAnswer';
+        final text = '⚠️ **[雲端 API 連線異常提示]**\n> 🔍 **診斷原因**：$errorDiagnosis\n> 🛡️ **已自動由本機端側智能引擎接管推論**\n\n$localAnswer';
+        return (text: text, modelUsed: 'Gemma 4 (2B) 接管', failureReason: errorDiagnosis);
       }
     }
   }
 
-  Future<String> _callGeminiMultimodalApi({
+  Future<({String text, String modelUsed})> _callGeminiMultimodalApi({
     required String modelName,
     required String prompt,
     required String apiKey,
@@ -195,7 +232,7 @@ class AiService {
     final cleanApiKey = apiKey.trim().replaceAll('"', '').replaceAll("'", '');
 
     // 支援官方 API 模型降級清單
-    // gemini-2.0-flash 已於 2026/6/1 正式停用，僅保留可用模型
+    // 優先調度 gemini-3.8-flash，若遇故障依序回退
     final candidateModels = <String>{
       modelName,
       'gemini-3.8-flash',
@@ -272,7 +309,8 @@ class AiService {
           if (candidates != null && candidates.isNotEmpty) {
             final parts = candidates[0]['content']?['parts'] as List?;
             if (parts != null && parts.isNotEmpty) {
-              return parts.map((p) => p['text'] ?? '').join('\n');
+              final text = parts.map((p) => p['text'] ?? '').join('\n');
+              return (text: text, modelUsed: targetModel);
             }
           }
         }

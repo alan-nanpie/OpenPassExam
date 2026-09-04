@@ -6,7 +6,7 @@ class AppConstants {
   static const String buildNumber = '1';
 
   // AI 預設配置
-  static const String defaultCloudAiModel = 'gemini-3.7-flash';
+  static const String defaultCloudAiModel = 'gemini-3.8-flash';
   static const String defaultFallbackAiModel = 'gemini-2.5-flash';
   static const String defaultOnDeviceAiModel = 'gemma-4-2b';
   static const double defaultAiTemperature = 1.0;

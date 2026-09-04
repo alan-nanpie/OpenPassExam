@@ -99,7 +99,7 @@ class AiTutorController extends ChangeNotifier {
       // 當使用者關閉「離線優先」開關時，視為要求使用雲端模式
       final isForceCloud = forceCloud ?? !isPreferOffline;
 
-      final responseText = await aiService.askAiTutor(
+      final tutorResult = await aiService.askAiTutorDetailed(
         prompt: prompt,
         questionContext: questionContext,
         ragChunks: chunks,
@@ -108,36 +108,16 @@ class AiTutorController extends ChangeNotifier {
         forceCloud: isForceCloud,
       );
 
-      final effectiveConfig = aiService.resolveEffectiveAiConfig();
-      final isOffline = await aiService.isOffline();
-      final isCloudUsed = !isOffline && (apiKey != null && apiKey.isNotEmpty) && isForceCloud;
-
-      // 提取是否包含雲端異常診斷或原因
-      String? failureReason;
-      if (responseText.contains('雲端 API 連線異常提示') || responseText.contains('雲端模式需要 Gemini API Key')) {
-        if (responseText.contains('診斷原因')) {
-          final start = responseText.indexOf('診斷原因**：');
-          final end = responseText.indexOf('\n', start);
-          if (start >= 0 && end > start) {
-            failureReason = responseText.substring(start + 7, end).trim();
-          }
-        } else if (!hasUserApiKey) {
-          failureReason = '未配置 Google Gemini API Key (BYOK)';
-        }
-      }
-
       _messages.add(
         ChatMessage(
           id: 'msg_${DateTime.now().millisecondsSinceEpoch}_ai',
-          text: responseText,
+          text: tutorResult.text,
           isUser: false,
           timestamp: DateTime.now(),
-          modelBadge: isCloudUsed
-              ? effectiveConfig.primaryModel
-              : (failureReason != null ? 'Gemma 4 (2B) 接管' : 'Gemma 4 (2B) 離線'),
+          modelBadge: tutorResult.modelUsed,
           questionContext: questionContext,
           personaStyle: _currentPersona.name,
-          failureReason: failureReason,
+          failureReason: tutorResult.failureReason,
         ),
       );
     } catch (e) {
