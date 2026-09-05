@@ -254,6 +254,8 @@ class AiService {
     } else if (lastFailureReason != null) {
       if (lastFailureReason.contains('API_KEY_INVALID') || lastFailureReason.contains('API key not valid')) {
         errorDiagnosis = '您設定的 Google Gemini API Key 無效或尚未啟用。請點擊右上角金鑰圖示 🔑，至 [Google AI Studio](https://aistudio.google.com/app/apikey) 免費建立正確金鑰。';
+      } else if (lastFailureReason.contains('credits are depleted') || lastFailureReason.contains('prepayment')) {
+        errorDiagnosis = '您的 Google AI Studio 帳戶預付點數已用罄 (Prepayment credits depleted)，請至 AI Studio 儲值或更換金鑰。';
       } else if (lastFailureReason.contains('RESOURCE_EXHAUSTED') || lastFailureReason.contains('429')) {
         errorDiagnosis = 'Gemini API Key 免費配額已耗盡 (429 RESOURCE_EXHAUSTED)。請更換或新增金鑰。';
       } else if (lastFailureReason.contains('PERMISSION_DENIED')) {
@@ -261,7 +263,7 @@ class AiService {
       } else if (lastFailureReason.contains('XMLHttpRequest') || lastFailureReason.contains('ClientException')) {
         errorDiagnosis = '瀏覽器發送網路請求失敗（可能是網路連線不穩或受廣告攔截插件阻擋）。';
       } else if (lastFailureReason.contains('TimeoutException')) {
-        errorDiagnosis = 'Google 雲端 API 伺服器連線逾時 (超過 15 秒)。';
+        errorDiagnosis = 'Google 雲端 API 伺服器連線逾時 (超過 25 秒)。';
       } else {
         errorDiagnosis = lastFailureReason;
       }
@@ -288,7 +290,9 @@ class AiService {
       modelName,
       'gemini-3.8-flash',
       'gemini-3.7-flash',
-      'gemini-3.6-flash',
+      'gemini-2.5-flash',
+      'gemini-2.5-pro',
+      'gemini-2.0-flash',
     }.toList();
 
     Exception? lastException;
@@ -301,10 +305,12 @@ class AiService {
     for (var mIdx = 0; mIdx < candidateModels.length; mIdx++) {
       final targetModel = candidateModels[mIdx];
       final stopwatch = Stopwatch()..start();
-      // 若該金鑰在此輪已發生過 1 次逾時，備用模型只給予 5 秒快速探測，避免長時間卡住
+      // 依模型與歷史逾時動態設定超時時間：
+      // Gemini 3.x / 2.5 思考模型在生成考題詳解與伺服器排隊時，通常需 10~20 秒
+      // 主推論模型給予 25 秒充裕時間；若前一個模型曾逾時，備用模型給予 15 秒容錯探測
       final timeoutDuration = (timeoutCount > 0)
-          ? const Duration(seconds: 5)
-          : const Duration(seconds: 10);
+          ? const Duration(seconds: 15)
+          : (mIdx == 0 ? const Duration(seconds: 25) : const Duration(seconds: 20));
       try {
         final url = Uri.parse(
           'https://generativelanguage.googleapis.com/v1beta/models/$targetModel:generateContent?key=$cleanApiKey',
@@ -322,22 +328,39 @@ class AiService {
         }
         userContent.writeln('【學員提問】: $prompt');
 
-        final isGemini3Family = targetModel.startsWith('gemini-3');
+        final isGemini3 = targetModel.startsWith('gemini-3');
+        final isGemini25 = targetModel.contains('2.5');
         final generationConfig = <String, dynamic>{
           'maxOutputTokens': config.maxTokens,
         };
 
-        if (isGemini3Family) {
-          // Gemini 3.x Flash 規範：
-          // 1. 移除 temperature, top_p, top_k, frequency_penalty, presence_penalty, candidate_count
-          // 2. thinkingConfig 採用 thinkingLevel 列舉 (LOW, MEDIUM, HIGH)，禁止 MINIMAL
+        if (isGemini3) {
+          // 【Gemini 3.x 世代官方規範】：
+          // 1. 取樣參數 (temperature, top_p, top_k) 官方強烈建議移除，完全採用預設調校
+          // 2. 思考推論控制採用 thinkingLevel 列舉 (LOW, MEDIUM, HIGH)；
+          //    注意：gemini-3.8-flash 與 3.7-flash 官方不支援 MINIMAL (會報錯)，預設為 MEDIUM
+          // 3. 官方明確規範：禁止傳入 thinkingBudget
           final level = config.thinkingLevel.toUpperCase();
           final validLevel = (level == 'LOW' || level == 'HIGH') ? level : 'MEDIUM';
           generationConfig['thinkingConfig'] = {
             'thinkingLevel': validLevel,
           };
+        } else if (isGemini25) {
+          // 【Gemini 2.5 世代官方規範】 (gemini-2.5-flash, gemini-2.5-pro)：
+          // 1. 保留傳統取樣參數 temperature
+          // 2. 官方明確規定：嚴禁向早期模型傳入 thinkingLevel (會直接報錯 HTTP 400)
+          // 3. 思考推論控制必須使用 thinkingBudget (整數，預設 4096，或 -1 代表動態思考)
+          generationConfig['temperature'] = config.temperature;
+          final budget = config.thinkingBudget > 0 ? config.thinkingBudget : 4096;
+          generationConfig['thinkingConfig'] = {
+            'thinkingBudget': budget,
+          };
         } else {
-          // 針對舊版備用模型 (如 gemini-2.5-flash) 保持相容參數
+          // 【Gemini 2.0 / 1.5 等經典模型世代】 (gemini-2.0-flash, gemini-1.5-flash 等)：
+          // 1. 保留傳統取樣參數 temperature
+          // 2. 嚴禁傳入 thinkingLevel
+          // 3. 一般模型不支援 thinkingConfig，傳入會引發 400 錯誤；
+          //    僅當模型名稱包含 'thinking' 實驗型時才附帶 thinkingBudget
           generationConfig['temperature'] = config.temperature;
           if (targetModel.contains('thinking') && config.thinkingBudget > 0) {
             generationConfig['thinkingConfig'] = {
@@ -379,19 +402,23 @@ class AiService {
           body: body,
         ).timeout(timeoutDuration);
 
-        // 遇到 503 (High Demand 暫時性壅塞)，若為 gemini-3.8-flash 則進行一次 0.5 秒退避重試
-        if (response.statusCode == 503 && targetModel == 'gemini-3.8-flash') {
+        // 遇到 503 (High Demand 暫時性尖峰壅塞)，進行一次 1 秒退避快速重試
+        if (response.statusCode == 503) {
           AiDebugLogService.instance.warn(
             'GeminiApi',
-            '模型 [$targetModel] 遭遇 503 暫時尖峰壅塞，進行退避 500ms 快速重試...',
-            {'statusCode': 503, 'retryAfterMs': 500},
+            '模型 [$targetModel] 遭遇 503 暫時尖峰壅塞，進行退避 1000ms 快速重試...',
+            {'statusCode': 503, 'retryAfterMs': 1000},
           );
-          await Future.delayed(const Duration(milliseconds: 500));
-          response = await http.post(
-            url,
-            headers: {'Content-Type': 'application/json'},
-            body: body,
-          ).timeout(timeoutDuration);
+          await Future.delayed(const Duration(milliseconds: 1000));
+          try {
+            response = await http.post(
+              url,
+              headers: {'Content-Type': 'application/json'},
+              body: body,
+            ).timeout(timeoutDuration);
+          } catch (_) {
+            // 若重試過程連線中斷或逾時，保留原 503 回應由後續候選模型處理
+          }
         }
 
         stopwatch.stop();
@@ -463,7 +490,7 @@ class AiService {
             errStr.contains('API_KEY_INVALID') ||
             errStr.contains('ACCESS_TOKEN_TYPE_UNSUPPORTED');
 
-        // 若此金鑰累計逾時達 2 次（例如 3.8 等 10s + 3.7 等 5s），代表此金鑰連線嚴重受阻，啟動熔斷換下一把！
+        // 若此金鑰累計逾時達 2 次（例如 3.8 等 25s + 3.7 等 15s），代表此金鑰連線嚴重受阻，啟動熔斷換下一把！
         final shouldBreakKey = isFatalAuthOrQuota || (timeoutCount >= 2);
 
         AiDebugLogService.instance.error(
@@ -530,7 +557,7 @@ class AiService {
     final cleanKey = apiKey.trim().replaceAll('"', '').replaceAll("'", '');
     if (cleanKey.isEmpty) return 'API Key 不能為空';
     
-    final probeModels = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash'];
+    final probeModels = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-2.5-flash', 'gemini-2.0-flash'];
     final maskedKey = cleanKey.length > 8
         ? '${cleanKey.substring(0, 4)}...${cleanKey.substring(cleanKey.length - 4)}'
         : '***';
@@ -579,8 +606,8 @@ class AiService {
           {'model': model, 'statusCode': response.statusCode},
         );
 
-        // 如果是 404 (模型名稱不支援)，繼續探測下一個模型
-        if (response.statusCode == 404) {
+        // 如果是 404 (模型名稱不支援) 或 503 (暫時性壅塞)，繼續探測下一個備用模型以驗證金鑰是否有效
+        if (response.statusCode == 404 || response.statusCode == 503) {
           continue;
         }
 
